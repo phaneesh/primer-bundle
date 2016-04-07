@@ -4,7 +4,7 @@
 
     <groupId>io.dropwizard.primer</groupId>
     <artifactId>primer-bundle</artifactId>
-    <version>0.0.1</version>
+    <version>0.0.2-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>primer-bundle</name>
