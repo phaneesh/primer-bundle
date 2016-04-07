@@ -32,7 +32,7 @@ import javax.ws.rs.core.Response;
 @Builder
 public class PrimerException extends Exception {
 
-    private Response.Status status;
+    private int status;
 
     private String errorCode;
 

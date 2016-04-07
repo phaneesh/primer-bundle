@@ -30,12 +30,14 @@ import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.primer.auth.PrimerAuthenticatorRequestFilter;
 import io.dropwizard.primer.cache.TokenCacheManager;
 import io.dropwizard.primer.client.PrimerClient;
+import io.dropwizard.primer.core.PrimerError;
 import io.dropwizard.primer.exception.PrimerException;
 import io.dropwizard.primer.exception.PrimerExceptionMapper;
 import io.dropwizard.primer.model.PrimerBundleConfiguration;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 /**
@@ -43,7 +45,7 @@ import java.nio.charset.StandardCharsets;
  */
 public abstract class PrimerBundle<T extends Configuration> implements ConfiguredBundle<T> {
 
-    private static PrimerClient primerClient;
+    private PrimerClient primerClient;
 
     public abstract PrimerBundleConfiguration getPrimerConfiguration(T configuration);
 
@@ -58,14 +60,24 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
         final JacksonDecoder decoder = new JacksonDecoder();
         final JacksonEncoder encoder = new JacksonEncoder();
         final Slf4jLogger logger = new Slf4jLogger();
-
         primerClient = Feign.builder()
                 .decoder(decoder)
                 .encoder(encoder)
-                .errorDecoder((methodKey, response) -> PrimerException.builder()
-                        .status(javax.ws.rs.core.Response.Status.fromStatusCode(response.status()))
-                        .errorCode("PR000")
-                        .message(response.body().toString()).build())
+                .errorDecoder((methodKey, response) -> {
+                    try {
+                        final PrimerError error =  environment.getObjectMapper().readValue(response.body().asInputStream(), PrimerError.class);
+                        return PrimerException.builder()
+                                .message(error.getMessage())
+                                .errorCode(error.getErrorCode())
+                                .status(response.status())
+                                .build();
+                    } catch (IOException e) {
+                        return PrimerException.builder()
+                                .status(response.status())
+                                .errorCode("PR000")
+                                .message(e.getMessage()).build();
+                    }
+                })
                 .client(new OkHttpClient())
                 .logger(logger)
                 .logLevel(Logger.Level.BASIC)

@@ -28,6 +28,7 @@ import io.dropwizard.primer.client.PrimerClient;
 import io.dropwizard.primer.core.PrimerError;
 import io.dropwizard.primer.core.ServiceUser;
 import io.dropwizard.primer.core.VerifyResponse;
+import io.dropwizard.primer.exception.PrimerException;
 import io.dropwizard.primer.model.PrimerBundleConfiguration;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
@@ -112,7 +113,7 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
             }
             JsonWebToken webToken = verifyToken(token.get());
             try {
-                checkExpiry(webToken);
+
                 final VerifyResponse verifyResponse = primerClient.verify(
                         webToken.claim().issuer(),
                         webToken.claim().subject(),
@@ -127,12 +128,14 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                     TokenCacheManager.cache(token.get());
                 }
             } catch (TokenExpiredException e) {
+                log.error("Token Expiry Error", e);
                 requestContext.abortWith(
                         Response.status(Response.Status.PRECONDITION_FAILED)
                                 .entity(PrimerError.builder().errorCode("PR003").message("Expired")
                                         .build()).build()
                 );
             } catch (FeignException e) {
+                log.error("Feign error", e);
                 if(e.status() == 403) {
                     TokenCacheManager.blackList(token.get());
                 }
@@ -141,7 +144,17 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                                 .entity(PrimerError.builder().errorCode("PR000").message("Error")
                                         .build()).build()
                 );
+            } catch (PrimerException e) {
+                log.error("Primer error", e);
+                if(e.getStatus() == Response.Status.FORBIDDEN.getStatusCode()) {
+                    TokenCacheManager.blackList(token.get());
+                }
+                requestContext.abortWith(
+                        Response.status(e.getStatus())
+                                .entity(PrimerError.builder().errorCode(e.getErrorCode()).message(e.getMessage()).build())
+                                        .build());
             }
+
         }
     }
 

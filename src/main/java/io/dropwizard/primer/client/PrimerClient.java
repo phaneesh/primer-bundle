@@ -21,6 +21,7 @@ import feign.Param;
 import feign.RequestLine;
 import io.dropwizard.primer.core.ServiceUser;
 import io.dropwizard.primer.core.VerifyResponse;
+import io.dropwizard.primer.exception.PrimerException;
 
 /**
  * @author phaneesh
@@ -31,5 +32,5 @@ public interface PrimerClient {
     @Headers({"Content-Type: application/json", "X-Auth-Token: {token}"})
     VerifyResponse verify(@Param("app") final String app,
                           @Param("id") final String id, @Param("token") final String token,
-                          final ServiceUser user);
+                          final ServiceUser user) throws PrimerException;
 }
