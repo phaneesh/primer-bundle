@@ -28,6 +28,8 @@ public class PrimerBundleConfiguration {
 
     private String privateKey;
 
+    private boolean enabled = true;
+
     @Singular("whiteList")
     private Set<String> whileListUrl = new HashSet<>();
 }

@@ -22,6 +22,7 @@ import com.github.toastshaman.dropwizard.auth.jwt.exceptions.TokenExpiredExcepti
 import com.github.toastshaman.dropwizard.auth.jwt.hmac.HmacSHA512Verifier;
 import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
 import com.google.common.base.Optional;
+import com.google.common.base.Strings;
 import feign.FeignException;
 import io.dropwizard.primer.cache.TokenCacheManager;
 import io.dropwizard.primer.client.PrimerClient;
@@ -83,6 +84,9 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
     @Override
     @Metered
     public void filter(ContainerRequestContext requestContext) throws IOException {
+        if(!configuration.isEnabled()) {
+            return;
+        }
         //Short circuit for all white listed urls
         if(isWhilisted(requestContext.getUriInfo().getPath())) {
             return;
@@ -111,15 +115,16 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                 //Ignore execution execution because of rejection
                 log.warn("Error getting token from cache: {}", e.getMessage());
             }
-            JsonWebToken webToken = verifyToken(token.get());
-            try {
 
+            try {
+                JsonWebToken webToken = verifyToken(token.get());
+                checkExpiry(webToken);
                 final VerifyResponse verifyResponse = primerClient.verify(
                         webToken.claim().issuer(),
                         webToken.claim().subject(),
                         token.get(),
                         ServiceUser.builder()
-                                .id(webToken.claim().subject())
+                                .id((String)webToken.claim().getParameter("user_id"))
                                 .name((String)webToken.claim().getParameter("name"))
                                 .role((String)webToken.claim().getParameter("role"))
                         .build()
@@ -153,6 +158,13 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                         Response.status(e.getStatus())
                                 .entity(PrimerError.builder().errorCode(e.getErrorCode()).message(e.getMessage()).build())
                                         .build());
+            } catch (NullPointerException e) {
+                log.error("Primer error", e);
+                requestContext.abortWith(
+                        Response.status(Response.Status.FORBIDDEN)
+                                .entity(PrimerError.builder().errorCode("PR002").message("Forbidden").build())
+                                .build());
+
             }
 
         }
@@ -162,7 +174,11 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
         final String header = requestContext.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
         log.info("Authorization Header: {}", header);
         if (header != null) {
-            return Optional.of(header.replaceAll(configuration.getPrefix(), "").trim());
+            final String rawToken = header.replaceAll(configuration.getPrefix(), "").trim();
+            if(Strings.isNullOrEmpty(rawToken)) {
+                return Optional.absent();
+            }
+            return Optional.of(rawToken);
         }
         return Optional.absent();
     }
