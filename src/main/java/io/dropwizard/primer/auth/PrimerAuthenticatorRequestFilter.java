@@ -221,7 +221,7 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
     }
 
     private boolean isWhilisted(final String path) {
-        return whitelist.parallelStream()
+        return whitelist.stream()
                 .filter(path::matches).findFirst().isPresent();
     }
 }
