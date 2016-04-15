@@ -33,7 +33,7 @@ Use the following maven dependency:
 <dependency>
     <groupId>io.dropwizard.primer</groupId>
     <artifactId>primer-bundle</artifactId>
-    <version>0.0.1</version>
+    <version>0.0.3-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -50,6 +50,24 @@ Use the following maven dependency:
             }
         });
     }
+```
+
+### Configuration
+```
+primer:
+  enabled: true
+  endpoint:
+    type: simple
+    host: my.primer.somewhere
+    port: 8080
+  cacheExpiry: 600
+  cacheMaxSize: 100000
+  clockSkew: 60
+  prefix: Bearer
+  privateKey: thisismynotsosecretkey 
+  whileListUrl:
+    - unprotected/url
+    - unprotected/url/{with}/{path}/{param}
 ```
 
 LICENSE

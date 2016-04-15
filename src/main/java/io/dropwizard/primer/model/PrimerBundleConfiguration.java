@@ -2,6 +2,7 @@ package io.dropwizard.primer.model;
 
 import lombok.*;
 
+import javax.validation.Valid;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -14,9 +15,8 @@ import java.util.Set;
 @Builder
 public class PrimerBundleConfiguration {
 
-    private String host;
-
-    private int port;
+    @Valid
+    private PrimerEndpoint endpoint;
 
     private int cacheExpiry;
 

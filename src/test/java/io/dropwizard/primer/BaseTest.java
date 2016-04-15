@@ -24,6 +24,7 @@ import io.dropwizard.jersey.setup.JerseyEnvironment;
 import io.dropwizard.jetty.MutableServletContextHandler;
 import io.dropwizard.lifecycle.setup.LifecycleEnvironment;
 import io.dropwizard.primer.model.PrimerBundleConfiguration;
+import io.dropwizard.primer.model.PrimerSimpleEndpoint;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import lombok.val;
@@ -78,8 +79,7 @@ public class BaseTest {
                 .cacheExpiry(30)
                 .cacheMaxSize(100)
                 .clockSkew(60)
-                .host("localhost")
-                .port(9999)
+                .endpoint(new PrimerSimpleEndpoint("simple", "localhost", 9999))
                 .privateKey("thisisatestkey")
                 .prefix("Bearer")
                 .whiteList("simple/noauth/test")

@@ -15,14 +15,17 @@
  */
 package io.dropwizard.primer;
 
+import com.fasterxml.jackson.databind.jsontype.NamedType;
 import com.github.toastshaman.dropwizard.auth.jwt.JsonWebTokenParser;
 import com.github.toastshaman.dropwizard.auth.jwt.hmac.HmacSHA512Verifier;
 import com.github.toastshaman.dropwizard.auth.jwt.parser.DefaultJsonWebTokenParser;
 import feign.Feign;
 import feign.Logger;
+import feign.Target;
 import feign.jackson.JacksonDecoder;
 import feign.jackson.JacksonEncoder;
 import feign.okhttp.OkHttpClient;
+import feign.ranger.RangerTarget;
 import feign.slf4j.Slf4jLogger;
 import io.dropwizard.Configuration;
 import io.dropwizard.ConfiguredBundle;
@@ -34,38 +37,66 @@ import io.dropwizard.primer.core.PrimerError;
 import io.dropwizard.primer.exception.PrimerException;
 import io.dropwizard.primer.exception.PrimerExceptionMapper;
 import io.dropwizard.primer.model.PrimerBundleConfiguration;
+import io.dropwizard.primer.model.PrimerRangerEndpoint;
+import io.dropwizard.primer.model.PrimerSimpleEndpoint;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
+import lombok.extern.slf4j.Slf4j;
+import lombok.val;
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.retry.RetryNTimes;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @author phaneesh
  */
+@Slf4j
 public abstract class PrimerBundle<T extends Configuration> implements ConfiguredBundle<T> {
 
-    private PrimerClient primerClient;
+    private static List<String> whiteList = new ArrayList<>();
 
     public abstract PrimerBundleConfiguration getPrimerConfiguration(T configuration);
 
+    /**
+     * Default method which provides a default curator for service discovery to work in case there is no other
+     * curator instance available. Override this to supply your own creator
+     * @param configuration Application configuration
+     * @return CuratorFramework
+     */
+    public CuratorFramework getCurator(T configuration) {
+        final PrimerBundleConfiguration primerBundleConfiguration = getPrimerConfiguration(configuration);
+        final val config = (PrimerRangerEndpoint)primerBundleConfiguration.getEndpoint();
+        final CuratorFramework curatorFramework = CuratorFrameworkFactory.builder()
+                .connectString(config.getZookeeper())
+                .namespace(config.getNamespace()).retryPolicy(new RetryNTimes(1000, 500)).build();
+        curatorFramework.start();
+        return curatorFramework;
+    }
+
     @Override
     public void initialize(Bootstrap<?> bootstrap) {
-
-
+        bootstrap.getObjectMapper().registerSubtypes(new NamedType(PrimerSimpleEndpoint.class, "simple"));
+        bootstrap.getObjectMapper().registerSubtypes(new NamedType(PrimerRangerEndpoint.class, "ranger"));
     }
 
     @Override
     public void run(T configuration, Environment environment) throws Exception {
+        final val primerConfig = getPrimerConfiguration(configuration);
+        initializeWhiteList(primerConfig);
         final JacksonDecoder decoder = new JacksonDecoder();
         final JacksonEncoder encoder = new JacksonEncoder();
         final Slf4jLogger logger = new Slf4jLogger();
-        primerClient = Feign.builder()
+        PrimerClient primerClient = Feign.builder()
                 .decoder(decoder)
                 .encoder(encoder)
                 .errorDecoder((methodKey, response) -> {
                     try {
-                        final PrimerError error =  environment.getObjectMapper().readValue(response.body().asInputStream(), PrimerError.class);
+                        final PrimerError error = environment.getObjectMapper().readValue(response.body().asInputStream(), PrimerError.class);
                         return PrimerException.builder()
                                 .message(error.getMessage())
                                 .errorCode(error.getErrorCode())
@@ -81,12 +112,12 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
                 .client(new OkHttpClient())
                 .logger(logger)
                 .logLevel(Logger.Level.BASIC)
-                .target(PrimerClient.class, String.format("http://%s:%d", getPrimerConfiguration(configuration).getHost(), getPrimerConfiguration(configuration).getPort()));
+                .target(getPrimerTarget(configuration, environment));
 
         environment.lifecycle().manage(new Managed() {
             @Override
             public void start() throws Exception {
-                TokenCacheManager.init(getPrimerConfiguration(configuration));
+                TokenCacheManager.init(primerConfig);
             }
 
             @Override
@@ -103,6 +134,35 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
                 .primerClient(primerClient)
                 .tokenParser(tokenParser)
                 .verifier(tokenVerifier)
+                .whitelist(whiteList)
         .build());
+    }
+
+    private Target<PrimerClient> getPrimerTarget(T configuration, Environment environment) {
+        final val primerConfig = getPrimerConfiguration(configuration);
+        switch(primerConfig.getEndpoint().getType()) {
+            case "simple":
+                final val endpoint = (PrimerSimpleEndpoint)primerConfig.getEndpoint();
+                return new Target.HardCodedTarget<>(PrimerClient.class,
+                        String.format("http://%s:%d", endpoint.getHost(), endpoint.getPort()));
+            case "ranger":
+                final val config = (PrimerRangerEndpoint)primerConfig.getEndpoint();
+                try {
+                    new RangerTarget<>(PrimerClient.class, config.getEnvironment(), config.getNamespace(),
+                            config.getService(), getCurator(configuration), false, environment.getObjectMapper());
+                } catch (Exception e) {
+                    log.error("Error creating ranger endpoint for primer", e);
+                    return null;
+                }
+        }
+        return null;
+    }
+
+    private void initializeWhiteList(final PrimerBundleConfiguration configuration) {
+        configuration.getWhileListUrl().forEach( p -> whiteList.add(generatePathExpression(p)));
+    }
+
+    private String generatePathExpression(final String path) {
+        return path.replaceAll("\\{(([^/])+\\})", "(([^/])+)");
     }
 }

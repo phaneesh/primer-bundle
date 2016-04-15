@@ -21,7 +21,6 @@ import com.github.toastshaman.dropwizard.auth.jwt.JsonWebTokenParser;
 import com.github.toastshaman.dropwizard.auth.jwt.exceptions.TokenExpiredException;
 import com.github.toastshaman.dropwizard.auth.jwt.hmac.HmacSHA512Verifier;
 import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
-import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 import feign.FeignException;
 import io.dropwizard.primer.cache.TokenCacheManager;
@@ -46,6 +45,8 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.Provider;
 import java.io.IOException;
+import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 
 import static com.google.common.base.Optional.fromNullable;
@@ -70,15 +71,19 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
 
     private final PrimerClient primerClient;
 
+    private final List<String> whitelist;
+
     @Builder
     public PrimerAuthenticatorRequestFilter(final JsonWebTokenParser tokenParser,
                                             final HmacSHA512Verifier verifier,
-                                            final PrimerBundleConfiguration configuration, final PrimerClient primerClient) {
+                                            final PrimerBundleConfiguration configuration, final PrimerClient primerClient,
+                                            final List<String> whitelist) {
         this.tokenParser = tokenParser;
         this.verifier = verifier;
         this.configuration = configuration;
         this.acceptableClockSkew = new Duration(configuration.getClockSkew());
         this.primerClient = primerClient;
+        this.whitelist = whitelist;
     }
 
     @Override
@@ -176,11 +181,11 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
         if (header != null) {
             final String rawToken = header.replaceAll(configuration.getPrefix(), "").trim();
             if(Strings.isNullOrEmpty(rawToken)) {
-                return Optional.absent();
+                return Optional.empty();
             }
             return Optional.of(rawToken);
         }
-        return Optional.absent();
+        return Optional.empty();
     }
 
     private JsonWebToken verifyToken(String rawToken) {
@@ -216,6 +221,7 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
     }
 
     private boolean isWhilisted(final String path) {
-        return configuration.getWhileListUrl().parallelStream().filter(path::startsWith).count() > 0;
+        return whitelist.parallelStream()
+                .filter(path::matches).findFirst().isPresent();
     }
 }
