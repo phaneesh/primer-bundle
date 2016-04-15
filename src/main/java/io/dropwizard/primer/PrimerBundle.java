@@ -60,17 +60,20 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
 
     private static List<String> whiteList = new ArrayList<>();
 
+    private static PrimerClient primerClient = null;
+
     public abstract PrimerBundleConfiguration getPrimerConfiguration(T configuration);
 
     /**
      * Default method which provides a default curator for service discovery to work in case there is no other
      * curator instance available. Override this to supply your own creator
+     *
      * @param configuration Application configuration
      * @return CuratorFramework
      */
     public CuratorFramework getCurator(T configuration) {
         final PrimerBundleConfiguration primerBundleConfiguration = getPrimerConfiguration(configuration);
-        final val config = (PrimerRangerEndpoint)primerBundleConfiguration.getEndpoint();
+        final val config = (PrimerRangerEndpoint) primerBundleConfiguration.getEndpoint();
         final CuratorFramework curatorFramework = CuratorFrameworkFactory.builder()
                 .connectString(config.getZookeeper())
                 .namespace(config.getNamespace()).retryPolicy(new RetryNTimes(1000, 500)).build();
@@ -91,33 +94,43 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
         final JacksonDecoder decoder = new JacksonDecoder();
         final JacksonEncoder encoder = new JacksonEncoder();
         final Slf4jLogger logger = new Slf4jLogger();
-        PrimerClient primerClient = Feign.builder()
-                .decoder(decoder)
-                .encoder(encoder)
-                .errorDecoder((methodKey, response) -> {
-                    try {
-                        final PrimerError error = environment.getObjectMapper().readValue(response.body().asInputStream(), PrimerError.class);
-                        return PrimerException.builder()
-                                .message(error.getMessage())
-                                .errorCode(error.getErrorCode())
-                                .status(response.status())
-                                .build();
-                    } catch (IOException e) {
-                        return PrimerException.builder()
-                                .status(response.status())
-                                .errorCode("PR000")
-                                .message(e.getMessage()).build();
-                    }
-                })
-                .client(new OkHttpClient())
-                .logger(logger)
-                .logLevel(Logger.Level.BASIC)
-                .target(getPrimerTarget(configuration, environment));
 
         environment.lifecycle().manage(new Managed() {
             @Override
             public void start() throws Exception {
                 TokenCacheManager.init(primerConfig);
+            }
+
+            @Override
+            public void stop() throws Exception {
+
+            }
+        });
+        environment.lifecycle().manage(new Managed() {
+            @Override
+            public void start() throws Exception {
+                primerClient = Feign.builder()
+                        .decoder(decoder)
+                        .encoder(encoder)
+                        .errorDecoder((methodKey, response) -> {
+                            try {
+                                final PrimerError error = environment.getObjectMapper().readValue(response.body().asInputStream(), PrimerError.class);
+                                return PrimerException.builder()
+                                        .message(error.getMessage())
+                                        .errorCode(error.getErrorCode())
+                                        .status(response.status())
+                                        .build();
+                            } catch (IOException e) {
+                                return PrimerException.builder()
+                                        .status(response.status())
+                                        .errorCode("PR000")
+                                        .message(e.getMessage()).build();
+                            }
+                        })
+                        .client(new OkHttpClient())
+                        .logger(logger)
+                        .logLevel(Logger.Level.BASIC)
+                        .target(getPrimerTarget(configuration, environment));
             }
 
             @Override
@@ -135,31 +148,32 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
                 .tokenParser(tokenParser)
                 .verifier(tokenVerifier)
                 .whitelist(whiteList)
-        .build());
+                .build());
     }
 
     private Target<PrimerClient> getPrimerTarget(T configuration, Environment environment) {
         final val primerConfig = getPrimerConfiguration(configuration);
-        switch(primerConfig.getEndpoint().getType()) {
+        switch (primerConfig.getEndpoint().getType()) {
             case "simple":
-                final val endpoint = (PrimerSimpleEndpoint)primerConfig.getEndpoint();
+                final val endpoint = (PrimerSimpleEndpoint) primerConfig.getEndpoint();
                 return new Target.HardCodedTarget<>(PrimerClient.class,
                         String.format("http://%s:%d", endpoint.getHost(), endpoint.getPort()));
             case "ranger":
-                final val config = (PrimerRangerEndpoint)primerConfig.getEndpoint();
+                final val config = (PrimerRangerEndpoint) primerConfig.getEndpoint();
                 try {
-                    new RangerTarget<>(PrimerClient.class, config.getEnvironment(), config.getNamespace(),
+                    return new RangerTarget<>(PrimerClient.class, config.getEnvironment(), config.getNamespace(),
                             config.getService(), getCurator(configuration), false, environment.getObjectMapper());
                 } catch (Exception e) {
                     log.error("Error creating ranger endpoint for primer", e);
                     return null;
                 }
+            default:
+                throw new IllegalArgumentException("unknown primer target type specified");
         }
-        return null;
     }
 
     private void initializeWhiteList(final PrimerBundleConfiguration configuration) {
-        configuration.getWhileListUrl().forEach( p -> whiteList.add(generatePathExpression(p)));
+        configuration.getWhileListUrl().forEach(p -> whiteList.add(generatePathExpression(p)));
     }
 
     private String generatePathExpression(final String path) {
