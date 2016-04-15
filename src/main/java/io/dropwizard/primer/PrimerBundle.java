@@ -64,6 +64,10 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
 
     public abstract PrimerBundleConfiguration getPrimerConfiguration(T configuration);
 
+    public static PrimerClient getPrimerClient() {
+        return primerClient;
+    }
+
     /**
      * Default method which provides a default curator for service discovery to work in case there is no other
      * curator instance available. Override this to supply your own creator
@@ -144,7 +148,6 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
         final HmacSHA512Verifier tokenVerifier = new HmacSHA512Verifier(secretKey);
         environment.jersey().register(PrimerAuthenticatorRequestFilter.builder()
                 .configuration(getPrimerConfiguration(configuration))
-                .primerClient(primerClient)
                 .tokenParser(tokenParser)
                 .verifier(tokenVerifier)
                 .whitelist(whiteList)

@@ -23,6 +23,7 @@ import com.github.toastshaman.dropwizard.auth.jwt.hmac.HmacSHA512Verifier;
 import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
 import com.google.common.base.Strings;
 import feign.FeignException;
+import io.dropwizard.primer.PrimerBundle;
 import io.dropwizard.primer.cache.TokenCacheManager;
 import io.dropwizard.primer.client.PrimerClient;
 import io.dropwizard.primer.core.PrimerError;
@@ -69,20 +70,17 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
 
     private final Duration acceptableClockSkew;
 
-    private final PrimerClient primerClient;
-
     private final List<String> whitelist;
 
     @Builder
     public PrimerAuthenticatorRequestFilter(final JsonWebTokenParser tokenParser,
                                             final HmacSHA512Verifier verifier,
-                                            final PrimerBundleConfiguration configuration, final PrimerClient primerClient,
+                                            final PrimerBundleConfiguration configuration,
                                             final List<String> whitelist) {
         this.tokenParser = tokenParser;
         this.verifier = verifier;
         this.configuration = configuration;
         this.acceptableClockSkew = new Duration(configuration.getClockSkew());
-        this.primerClient = primerClient;
         this.whitelist = whitelist;
     }
 
@@ -124,7 +122,7 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
             try {
                 JsonWebToken webToken = verifyToken(token.get());
                 checkExpiry(webToken);
-                final VerifyResponse verifyResponse = primerClient.verify(
+                final VerifyResponse verifyResponse = PrimerBundle.getPrimerClient().verify(
                         webToken.claim().issuer(),
                         webToken.claim().subject(),
                         token.get(),
@@ -146,7 +144,7 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                 );
             } catch (FeignException e) {
                 log.error("Feign error", e);
-                if(e.status() == 403) {
+                if(e.status() == Response.Status.FORBIDDEN.getStatusCode()) {
                     TokenCacheManager.blackList(token.get());
                 }
                 requestContext.abortWith(
