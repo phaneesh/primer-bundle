@@ -31,11 +31,13 @@ import io.dropwizard.Configuration;
 import io.dropwizard.ConfiguredBundle;
 import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.primer.auth.PrimerAuthenticatorRequestFilter;
+import io.dropwizard.primer.auth.PrimerAuthorizationRegistry;
 import io.dropwizard.primer.cache.TokenCacheManager;
 import io.dropwizard.primer.client.PrimerClient;
 import io.dropwizard.primer.core.PrimerError;
 import io.dropwizard.primer.exception.PrimerException;
 import io.dropwizard.primer.exception.PrimerExceptionMapper;
+import io.dropwizard.primer.model.PrimerAuthorizationMatrix;
 import io.dropwizard.primer.model.PrimerBundleConfiguration;
 import io.dropwizard.primer.model.PrimerRangerEndpoint;
 import io.dropwizard.primer.model.PrimerSimpleEndpoint;
@@ -49,8 +51,8 @@ import org.apache.curator.retry.RetryNTimes;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * @author phaneesh
@@ -58,11 +60,15 @@ import java.util.List;
 @Slf4j
 public abstract class PrimerBundle<T extends Configuration> implements ConfiguredBundle<T> {
 
-    private static List<String> whiteList = new ArrayList<>();
+    //private static List<String> whiteList = new ArrayList<>();
 
     private static PrimerClient primerClient = null;
 
     public abstract PrimerBundleConfiguration getPrimerConfiguration(T configuration);
+
+    public abstract Set<String> withWhiteList(T configuration);
+
+    public abstract PrimerAuthorizationMatrix withAuthorization(T configuration);
 
     public static PrimerClient getPrimerClient() {
         return primerClient;
@@ -94,7 +100,7 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
     @Override
     public void run(T configuration, Environment environment) throws Exception {
         final val primerConfig = getPrimerConfiguration(configuration);
-        initializeWhiteList(primerConfig);
+        initializeAuthorization(configuration);
         final JacksonDecoder decoder = new JacksonDecoder();
         final JacksonEncoder encoder = new JacksonEncoder();
         final Slf4jLogger logger = new Slf4jLogger();
@@ -150,7 +156,6 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
                 .configuration(getPrimerConfiguration(configuration))
                 .tokenParser(tokenParser)
                 .verifier(tokenVerifier)
-                .whitelist(whiteList)
                 .build());
     }
 
@@ -175,11 +180,21 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
         }
     }
 
-    private void initializeWhiteList(final PrimerBundleConfiguration configuration) {
-        configuration.getWhileListUrl().forEach(p -> whiteList.add(generatePathExpression(p)));
-    }
-
-    private String generatePathExpression(final String path) {
-        return path.replaceAll("\\{(([^/])+\\})", "(([^/])+)");
+    private void initializeAuthorization(T configuration) {
+        final val primerConfig = getPrimerConfiguration(configuration);
+        Set<String> dynamicWhiteList = withWhiteList(configuration);
+        if(dynamicWhiteList != null) {
+            dynamicWhiteList = new HashSet<>();
+            primerConfig.getWhileListUrl().forEach(dynamicWhiteList::add);
+        } else {
+            dynamicWhiteList = primerConfig.getWhileListUrl();
+        }
+        PrimerAuthorizationMatrix permissionMatrix = primerConfig.getAuthorizations();
+        if(permissionMatrix == null) {
+            permissionMatrix = withAuthorization(configuration);
+        } else {
+            permissionMatrix.getAuthorizations().addAll(withAuthorization(configuration).getAuthorizations());
+        }
+        PrimerAuthorizationRegistry.init(permissionMatrix, dynamicWhiteList);
     }
 }

@@ -23,17 +23,12 @@ import com.github.toastshaman.dropwizard.auth.jwt.hmac.HmacSHA512Verifier;
 import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
 import com.google.common.base.Strings;
 import feign.FeignException;
-import io.dropwizard.primer.PrimerBundle;
 import io.dropwizard.primer.cache.TokenCacheManager;
-import io.dropwizard.primer.client.PrimerClient;
 import io.dropwizard.primer.core.PrimerError;
-import io.dropwizard.primer.core.ServiceUser;
-import io.dropwizard.primer.core.VerifyResponse;
 import io.dropwizard.primer.exception.PrimerException;
 import io.dropwizard.primer.model.PrimerBundleConfiguration;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.joda.time.Duration;
 import org.joda.time.Instant;
 import org.joda.time.Interval;
@@ -46,7 +41,6 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.Provider;
 import java.io.IOException;
-import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 
@@ -70,28 +64,24 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
 
     private final Duration acceptableClockSkew;
 
-    private final List<String> whitelist;
-
     @Builder
     public PrimerAuthenticatorRequestFilter(final JsonWebTokenParser tokenParser,
                                             final HmacSHA512Verifier verifier,
-                                            final PrimerBundleConfiguration configuration,
-                                            final List<String> whitelist) {
+                                            final PrimerBundleConfiguration configuration) {
         this.tokenParser = tokenParser;
         this.verifier = verifier;
         this.configuration = configuration;
         this.acceptableClockSkew = new Duration(configuration.getClockSkew());
-        this.whitelist = whitelist;
     }
 
     @Override
-    @Metered
+    @Metered(name = "primer")
     public void filter(ContainerRequestContext requestContext) throws IOException {
         if(!configuration.isEnabled()) {
             return;
         }
         //Short circuit for all white listed urls
-        if(isWhilisted(requestContext.getUriInfo().getPath())) {
+        if(PrimerAuthorizationRegistry.isWhilisted(requestContext.getUriInfo().getPath())) {
             return;
         }
         Optional<String> token = getToken(requestContext);
@@ -106,9 +96,10 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                 if(TokenCacheManager.checkBlackList(token.get())) {
                     requestContext.abortWith(
                             Response.status(Response.Status.FORBIDDEN)
-                                    .entity(PrimerError.builder().errorCode("PR004").message("Forbidden")
+                                    .entity(PrimerError.builder().errorCode("PR002").message("Forbidden")
                                             .build()).build()
                     );
+                    return;
                 }
                 if(TokenCacheManager.checkCache(token.get())) {
                     //Short circuit for optimization
@@ -118,22 +109,16 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                 //Ignore execution execution because of rejection
                 log.warn("Error getting token from cache: {}", e.getMessage());
             }
-
             try {
                 JsonWebToken webToken = verifyToken(token.get());
                 checkExpiry(webToken);
-                final VerifyResponse verifyResponse = PrimerBundle.getPrimerClient().verify(
-                        webToken.claim().issuer(),
-                        webToken.claim().subject(),
-                        token.get(),
-                        ServiceUser.builder()
-                                .id((String)webToken.claim().getParameter("user_id"))
-                                .name((String)webToken.claim().getParameter("name"))
-                                .role((String)webToken.claim().getParameter("role"))
-                        .build()
-                );
-                if(!StringUtils.isBlank(verifyResponse.getToken()) && !StringUtils.isBlank(verifyResponse.getUserId())) {
-                    TokenCacheManager.cache(token.get());
+                boolean isAuthorized = authorize(requestContext, webToken, token.get());
+                if(!isAuthorized) {
+                    requestContext.abortWith(
+                            Response.status(Response.Status.UNAUTHORIZED)
+                                    .entity(PrimerError.builder().errorCode("PR002").message("Unauthorized")
+                                            .build()).build()
+                    );
                 }
             } catch (TokenExpiredException e) {
                 log.error("Token Expiry Error", e);
@@ -171,6 +156,11 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
             }
 
         }
+    }
+
+    private boolean authorize(ContainerRequestContext requestContext, JsonWebToken webToken, String token) throws PrimerException {
+        return PrimerAuthorizationRegistry.authorize(requestContext.getUriInfo().getPath(),
+                (String)webToken.claim().getParameter("role"), requestContext.getMethod(), token, webToken);
     }
 
     private Optional<String> getToken(ContainerRequestContext requestContext) {
@@ -216,10 +206,5 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
             return null;
         }
         return new Instant(input * 1000);
-    }
-
-    private boolean isWhilisted(final String path) {
-        return whitelist.stream()
-                .filter(path::matches).findFirst().isPresent();
     }
 }

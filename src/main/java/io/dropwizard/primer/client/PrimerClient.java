@@ -21,6 +21,7 @@ import feign.Param;
 import feign.RequestLine;
 import io.dropwizard.primer.core.ServiceUser;
 import io.dropwizard.primer.core.VerifyResponse;
+import io.dropwizard.primer.core.VerifyStaticResponse;
 import io.dropwizard.primer.exception.PrimerException;
 
 /**
@@ -33,4 +34,10 @@ public interface PrimerClient {
     VerifyResponse verify(@Param("app") final String app,
                           @Param("id") final String id, @Param("token") final String token,
                           final ServiceUser user) throws PrimerException;
+
+    @RequestLine("POST /v1/verify/static/{app}/{id}/{role}")
+    @Headers({"Content-Type: application/json", "X-Auth-Token: {token}"})
+    VerifyStaticResponse verify(@Param("app") final String app,
+                                @Param("id") final String id, @Param("token") final String token,
+                                @Param("role") final String role) throws PrimerException;
 }

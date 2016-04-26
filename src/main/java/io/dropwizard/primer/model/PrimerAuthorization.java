@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-package io.dropwizard.primer.exception;
+package io.dropwizard.primer.model;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
+import org.hibernate.validator.constraints.NotBlank;
+import org.hibernate.validator.constraints.NotEmpty;
+
+import java.util.Set;
 
 /**
  * @author phaneesh
@@ -28,11 +29,19 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class PrimerException extends Exception {
+public class PrimerAuthorization {
 
-    private int status;
+    private String type = "dynamic";
 
-    private String errorCode;
+    @Singular
+    @NotEmpty
+    private Set<String> methods;
 
-    private String message;
+    @Singular
+    @NotEmpty
+    private Set<String> roles;
+
+    @NotBlank
+    private String url;
+
 }

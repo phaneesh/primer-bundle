@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.dropwizard.primer.exception;
+package io.dropwizard.primer.core;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -28,11 +28,11 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class PrimerException extends Exception {
+public class VerifyStaticResponse {
 
-    private int status;
+    private String id;
 
-    private String errorCode;
+    private String token;
 
-    private String message;
+    private String role;
 }

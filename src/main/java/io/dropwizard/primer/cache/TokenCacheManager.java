@@ -69,8 +69,12 @@ public class TokenCacheManager {
         lruCache.put(token, Optional.of(true));
     }
 
-    public static boolean checkCache(String token) throws ExecutionException {
-        return lruCache.get(token).get();
+    public static boolean checkCache(String token) {
+        try {
+            return lruCache.get(token).get();
+        } catch (ExecutionException e) {
+            return false;
+        }
     }
 
     public static boolean checkBlackList(String token) throws ExecutionException {

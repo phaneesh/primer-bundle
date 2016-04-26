@@ -4,11 +4,13 @@ This bundle adds Primer JWT service support for dropwizard.
 This bundle compiles only on Java 8.
  
 ## Dependencies
-* Primer
+* [Primer](https://github.com/phaneesh/primer)
 
 ## Usage
 The bundle adds Primer JWT service support for dropwizard. 
-This makes it easier to secure the your API with JWT and a robust claims negotiation. 
+This makes it easier to secure the your API with JWT and a robust claims negotiation.
+Tokens can be either static (no expiry) or dynamic with expiry. 
+As a added bonus; it supports declarative role based authorizations
  
 ### Build instructions
   - Clone the source:
@@ -33,7 +35,7 @@ Use the following maven dependency:
 <dependency>
     <groupId>io.dropwizard.primer</groupId>
     <artifactId>primer-bundle</artifactId>
-    <version>0.0.3-SNAPSHOT</version>
+    <version>0.0.4-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -46,6 +48,14 @@ Use the following maven dependency:
         bootstrap.addBundle(new PrimerBundle() {
             
             public PrimerBundleConfiguration getPrimerConfiguration() {
+                ...
+            }
+            
+            public Set<String> withWhiteList(T configuration) {
+                ...
+            }
+            
+            public PrimerAuthorizationMatrix withAuthorization(T configuration) {
                 ...
             }
         });
@@ -68,6 +78,19 @@ primer:
   whileListUrl:
     - unprotected/url
     - unprotected/url/{with}/{path}/{param}
+  authorizations:
+    - type: dynamic
+      methods:
+        - GET
+      roles:
+        - user
+      url: protected/user/{do}/{some}/{stuff}
+    - type: static
+      methods:
+        - POST
+      roles:
+        - admin
+      url: protected/admin/{do}/{admin}/{stuff}  
 ```
 
 LICENSE

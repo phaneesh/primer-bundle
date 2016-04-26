@@ -14,25 +14,24 @@
  * limitations under the License.
  */
 
-package io.dropwizard.primer.exception;
+package io.dropwizard.primer.model;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
+
+import java.util.List;
 
 /**
  * @author phaneesh
  */
 @Data
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 @Builder
-public class PrimerException extends Exception {
+public class PrimerAuthorizationMatrix {
 
-    private int status;
+    @Singular
+    List<PrimerAuthorization> staticAuthorizations;
 
-    private String errorCode;
-
-    private String message;
+    @Singular
+    List<PrimerAuthorization> authorizations;
 }

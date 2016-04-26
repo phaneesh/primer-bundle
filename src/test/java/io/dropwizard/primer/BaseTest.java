@@ -18,16 +18,23 @@ package io.dropwizard.primer;
 
 import com.codahale.metrics.health.HealthCheckRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.toastshaman.dropwizard.auth.jwt.hmac.HmacSHA512Signer;
+import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
+import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebTokenClaim;
+import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebTokenHeader;
 import io.dropwizard.Configuration;
 import io.dropwizard.jersey.DropwizardResourceConfig;
 import io.dropwizard.jersey.setup.JerseyEnvironment;
 import io.dropwizard.jetty.MutableServletContextHandler;
 import io.dropwizard.lifecycle.setup.LifecycleEnvironment;
+import io.dropwizard.primer.model.PrimerAuthorization;
+import io.dropwizard.primer.model.PrimerAuthorizationMatrix;
 import io.dropwizard.primer.model.PrimerBundleConfiguration;
 import io.dropwizard.primer.model.PrimerSimpleEndpoint;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import lombok.val;
+import org.joda.time.DateTime;
 import org.junit.Before;
 
 import java.io.IOException;
@@ -36,6 +43,7 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.CertificateException;
+import java.util.Set;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -52,16 +60,54 @@ public class BaseTest {
     protected final Bootstrap<?> bootstrap = mock(Bootstrap.class);
     protected final Configuration configuration = mock(Configuration.class);
 
+    protected static final ObjectMapper mapper = new ObjectMapper();
+
     protected final PrimerBundle<Configuration> bundle = new PrimerBundle<Configuration>() {
+
 
         @Override
         public PrimerBundleConfiguration getPrimerConfiguration(Configuration configuration) {
             return primerBundleConfiguration;
         }
+
+        @Override
+        public Set<String> withWhiteList(Configuration configuration) {
+            return primerBundleConfiguration.getWhileListUrl();
+        }
+
+        @Override
+        public PrimerAuthorizationMatrix withAuthorization(Configuration configuration) {
+            return PrimerAuthorizationMatrix.builder()
+                    .authorization(PrimerAuthorization.builder()
+                            .type("dynamic")
+                            .method("GET")
+                            .role("test")
+                            .url("simple/auth/test")
+                    .build()).build();
+        }
     };
 
     protected PrimerBundleConfiguration primerBundleConfiguration;
 
+    protected HmacSHA512Signer hmacSHA512Signer;
+
+    public JsonWebToken webToken = JsonWebToken.builder()
+            .header(
+                    JsonWebTokenHeader.HS512()
+            )
+            .claim(JsonWebTokenClaim
+                    .builder()
+                    .expiration(DateTime.now().plusYears(1))
+                    .subject("test")
+                    .issuer("test")
+                    .issuedAt(DateTime.now())
+                    .param("user_id", "test")
+                    .param("role", "test")
+                    .param("name", "test")
+                    .build())
+            .build();
+
+    public String token = null;
 
     protected static BundleTestResource bundleTestResource = new BundleTestResource();
 
@@ -71,7 +117,7 @@ public class BaseTest {
         when(environment.jersey()).thenReturn(jerseyEnvironment);
         when(environment.lifecycle()).thenReturn(lifecycleEnvironment);
         when(environment.healthChecks()).thenReturn(healthChecks);
-        when(environment.getObjectMapper()).thenReturn(new ObjectMapper());
+        when(environment.getObjectMapper()).thenReturn(mapper);
         when(bootstrap.getObjectMapper()).thenReturn(new ObjectMapper());
         when(environment.getApplicationContext()).thenReturn(new MutableServletContextHandler());
 
@@ -88,6 +134,10 @@ public class BaseTest {
         bundle.initialize(bootstrap);
 
         bundle.run(configuration, environment);
+
+        hmacSHA512Signer = new HmacSHA512Signer(primerBundleConfiguration.getPrivateKey().getBytes());
+
+        token = hmacSHA512Signer.sign(webToken);
 
         lifecycleEnvironment.getManagedObjects().forEach(object -> {
             try {

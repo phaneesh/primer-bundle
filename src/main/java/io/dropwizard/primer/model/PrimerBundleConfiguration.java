@@ -32,4 +32,6 @@ public class PrimerBundleConfiguration {
 
     @Singular("whiteList")
     private Set<String> whileListUrl = new HashSet<>();
+
+    private PrimerAuthorizationMatrix authorizations;
 }
