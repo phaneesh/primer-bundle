@@ -18,8 +18,6 @@ package io.dropwizard.primer.auth;
 
 import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
 import com.google.common.base.Charsets;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.hash.Hashing;
 import io.dropwizard.primer.PrimerBundle;
 import io.dropwizard.primer.cache.TokenCacheManager;
@@ -33,6 +31,9 @@ import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.lang3.StringUtils;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -41,27 +42,24 @@ import java.util.Set;
 @Slf4j
 public class PrimerAuthorizationRegistry {
 
-    private static ImmutableMap<String, String> urlIndex;
+    private static Map<String, String> urlIndex;
 
-    private static ImmutableMap<String, PrimerAuthorization> authList;
+    private static Map<String, PrimerAuthorization> authList;
 
-    private static ImmutableSet<String> whiteList;
+    private static Set<String> whiteList;
 
     public static void init(PrimerAuthorizationMatrix matrix, Set<String> whiteListUrls) {
-        val authListBuilder = ImmutableMap.<String, PrimerAuthorization>builder();
-        val urlIndexBuilder = ImmutableMap.<String, String>builder();
+        authList = new HashMap<>();
+        urlIndex = new HashMap<>();
+        whiteList = new HashSet<>();
         if(matrix != null) {
             matrix.getAuthorizations().forEach( auth -> {
-                String indexId = Hashing.murmur3_128().hashString(auth.getUrl(), Charsets.UTF_8).toString();
-                urlIndexBuilder.put(indexId, generatePathExpression(auth.getUrl()));
-                authListBuilder.put(indexId, auth);
+                final String indexId = Hashing.murmur3_128().hashString(auth.getUrl(), Charsets.UTF_8).toString();
+                urlIndex.put(indexId, generatePathExpression(auth.getUrl()));
+                authList.put(indexId, auth);
             });
         }
-        authList = authListBuilder.build();
-        urlIndex = urlIndexBuilder.build();
-        val whiteListBuilder = ImmutableSet.<String>builder();
-        whiteListUrls.forEach(p -> whiteListBuilder.add(generatePathExpression(p)));
-        whiteList = whiteListBuilder.build();
+        whiteListUrls.forEach( url -> whiteList.add(generatePathExpression(url)));
     }
 
     private static String generatePathExpression(final String path) {

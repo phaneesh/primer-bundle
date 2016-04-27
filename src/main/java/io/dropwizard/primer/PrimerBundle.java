@@ -182,12 +182,13 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
 
     private void initializeAuthorization(T configuration) {
         final val primerConfig = getPrimerConfiguration(configuration);
-        Set<String> dynamicWhiteList = withWhiteList(configuration);
+        final Set<String> whiteListUrls = new HashSet<>();
+        final Set<String> dynamicWhiteList = withWhiteList(configuration);
         if(dynamicWhiteList != null) {
-            dynamicWhiteList = new HashSet<>();
-            primerConfig.getWhileListUrl().forEach(dynamicWhiteList::add);
-        } else {
-            dynamicWhiteList = primerConfig.getWhileListUrl();
+            whiteListUrls.addAll(dynamicWhiteList);
+        }
+        if(primerConfig.getWhileListUrl() != null) {
+            whiteListUrls.addAll(primerConfig.getWhileListUrl());
         }
         PrimerAuthorizationMatrix permissionMatrix = primerConfig.getAuthorizations();
         if(permissionMatrix == null) {
@@ -195,6 +196,6 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
         } else {
             permissionMatrix.getAuthorizations().addAll(withAuthorization(configuration).getAuthorizations());
         }
-        PrimerAuthorizationRegistry.init(permissionMatrix, dynamicWhiteList);
+        PrimerAuthorizationRegistry.init(permissionMatrix, whiteListUrls);
     }
 }
