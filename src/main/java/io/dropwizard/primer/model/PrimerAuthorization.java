@@ -13,13 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.dropwizard.primer.model;
 
 import lombok.*;
 import org.hibernate.validator.constraints.NotBlank;
 import org.hibernate.validator.constraints.NotEmpty;
-
 import java.util.Set;
 
 /**
@@ -31,6 +29,9 @@ import java.util.Set;
 @Builder
 public class PrimerAuthorization {
 
+    /**
+     * Type can be dynamic, static or auto (to support both)
+     */
     private String type = "dynamic";
 
     @Singular

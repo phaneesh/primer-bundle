@@ -63,7 +63,7 @@ Use the following maven dependency:
 ```
 
 ### Configuration
-```
+```yaml
 primer:
   enabled: true
   endpoint:
@@ -79,7 +79,7 @@ primer:
     - unprotected/url
     - unprotected/url/{with}/{path}/{param}
   authorizations:
-    - type: dynamic
+    - type: dynamic #can be static, dynamic or auto (uses token to infer the type of auth)
       methods:
         - GET
       roles:

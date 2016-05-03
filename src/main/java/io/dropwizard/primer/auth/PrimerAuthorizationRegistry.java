@@ -80,9 +80,12 @@ public class PrimerAuthorizationRegistry {
         }
         switch (authList.get(index.get().getKey()).getType()) {
             case "dynamic":
-                return verify(jsonWebToken, token);
+                return verify(jsonWebToken, token, "dynamic");
             case "static":
-                return verifyStatic(jsonWebToken, token);
+                return verify(jsonWebToken, token, "static");
+            case "auto":
+                final String type = (String)jsonWebToken.claim().getParameter("type");
+                return verify(jsonWebToken, token, type);
             default:
                 return false;
         }
@@ -95,6 +98,16 @@ public class PrimerAuthorizationRegistry {
 
     private static boolean isAuthorized(final String id, final String method, final String role) {
         return authList.get(id).getRoles().contains(role) && authList.get(id).getMethods().contains(method);
+    }
+
+    private static boolean verify(JsonWebToken webToken, String token, String type) throws PrimerException {
+        switch (type) {
+            case "dynamic":
+                return verify(webToken, token);
+            case "static":
+                return verifyStatic(webToken, token);
+        }
+        return false;
     }
 
     private static boolean verify(JsonWebToken webToken, String token) throws PrimerException {
