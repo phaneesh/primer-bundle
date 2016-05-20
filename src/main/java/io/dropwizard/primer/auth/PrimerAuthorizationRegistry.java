@@ -58,6 +58,11 @@ public class PrimerAuthorizationRegistry {
                 urlIndex.put(indexId, generatePathExpression(auth.getUrl()));
                 authList.put(indexId, auth);
             });
+            matrix.getStaticAuthorizations().forEach( auth -> {
+                final String indexId = Hashing.murmur3_128().hashString(auth.getUrl(), Charsets.UTF_8).toString();
+                urlIndex.put(indexId, generatePathExpression(auth.getUrl()));
+                authList.put(indexId, auth);
+            });
         }
         whiteListUrls.forEach( url -> whiteList.add(generatePathExpression(url)));
     }
