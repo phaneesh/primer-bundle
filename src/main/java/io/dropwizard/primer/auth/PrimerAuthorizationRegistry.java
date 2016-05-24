@@ -106,7 +106,7 @@ public class PrimerAuthorizationRegistry {
 
     public static boolean isWhilisted(final String path) {
         return whiteList.stream()
-                .filter(p -> path.startsWith(p) && path.matches(p)).findFirst().isPresent();
+                .filter(path::matches).findFirst().isPresent();
     }
 
     private static boolean isAuthorized(final String id, final String method, final String role) {
