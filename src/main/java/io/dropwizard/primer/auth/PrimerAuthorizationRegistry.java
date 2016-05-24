@@ -72,6 +72,7 @@ public class PrimerAuthorizationRegistry {
         }
         whiteListUrls.forEach( url -> whiteList.add(generatePathExpression(url)));
         Collections.sort(whiteList, (o1, o2) -> tokenMatch.matcher(o2).groupCount() - tokenMatch.matcher(o1).groupCount());
+        Collections.sort(whiteList, (o1, o2) -> o2.compareTo(o1));
     }
 
     private static String generatePathExpression(final String path) {
