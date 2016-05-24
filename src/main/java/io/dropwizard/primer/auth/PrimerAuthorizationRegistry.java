@@ -31,10 +31,10 @@ import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.commons.lang3.StringUtils;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.function.Predicate;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * @author phaneesh
@@ -42,29 +42,36 @@ import java.util.Set;
 @Slf4j
 public class PrimerAuthorizationRegistry {
 
-    private static Map<String, String> urlIndex;
-
     private static Map<String, PrimerAuthorization> authList;
 
-    private static Set<String> whiteList;
+    private static List<String> whiteList;
+
+    private static List<String> urlPatterns;
+
 
     public static void init(PrimerAuthorizationMatrix matrix, Set<String> whiteListUrls) {
         authList = new HashMap<>();
-        urlIndex = new HashMap<>();
-        whiteList = new HashSet<>();
+        whiteList = new ArrayList<>();
+        urlPatterns = new ArrayList<>();
+        val urlToAuthMap = new HashMap<String, PrimerAuthorization>();
+        val tokenMatch = Pattern.compile("\\{(([^/])+\\})");
         if(matrix != null) {
             matrix.getAuthorizations().forEach( auth -> {
-                final String indexId = Hashing.murmur3_128().hashString(auth.getUrl(), Charsets.UTF_8).toString();
-                urlIndex.put(indexId, generatePathExpression(auth.getUrl()));
-                authList.put(indexId, auth);
+                final String pattern = generatePathExpression(auth.getUrl());
+                urlPatterns.add(pattern);
+                urlToAuthMap.put(pattern, auth);
             });
             matrix.getStaticAuthorizations().forEach( auth -> {
-                final String indexId = Hashing.murmur3_128().hashString(auth.getUrl(), Charsets.UTF_8).toString();
-                urlIndex.put(indexId, generatePathExpression(auth.getUrl()));
-                authList.put(indexId, auth);
+                final String pattern = generatePathExpression(auth.getUrl());
+                urlPatterns.add(pattern);
+                urlToAuthMap.put(pattern, auth);
             });
+            Collections.sort(urlPatterns, (o1, o2) -> tokenMatch.matcher(o2).groupCount() - tokenMatch.matcher(o1).groupCount());
+            Collections.sort(urlPatterns, (o1, o2) -> o2.compareTo(o1));
+            urlPatterns.forEach( pattern -> authList.put(pattern, urlToAuthMap.get(pattern)));
         }
         whiteListUrls.forEach( url -> whiteList.add(generatePathExpression(url)));
+        Collections.sort(whiteList, (o1, o2) -> tokenMatch.matcher(o2).groupCount() - tokenMatch.matcher(o1).groupCount());
     }
 
     private static String generatePathExpression(final String path) {
@@ -73,17 +80,18 @@ public class PrimerAuthorizationRegistry {
 
     public static boolean authorize(final String path, final String role, final String method, final String token,
                                     final JsonWebToken jsonWebToken) throws PrimerException {
-        val index = urlIndex.entrySet().stream().filter(e -> path.matches(e.getValue())).findFirst();
+        if(TokenCacheManager.checkCache(token)) {
+            return true;
+        }
+
+        val index = urlPatterns.stream().filter(path::matches).findFirst();
         if(!index.isPresent())
             return false;
 
         //Short circuit for method auth failure
-        if(!isAuthorized(index.get().getKey(), method, role))
+        if(!isAuthorized(index.get(), method, role))
             return false;
-        if(TokenCacheManager.checkCache(token)) {
-            return true;
-        }
-        switch (authList.get(index.get().getKey()).getType()) {
+        switch (authList.get(index.get()).getType()) {
             case "dynamic":
                 return verify(jsonWebToken, token, "dynamic");
             case "static":
@@ -98,7 +106,7 @@ public class PrimerAuthorizationRegistry {
 
     public static boolean isWhilisted(final String path) {
         return whiteList.stream()
-                .filter(path::matches).findFirst().isPresent();
+                .filter(p -> path.startsWith(p) && path.matches(p)).findFirst().isPresent();
     }
 
     private static boolean isAuthorized(final String id, final String method, final String role) {
