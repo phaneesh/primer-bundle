@@ -22,6 +22,7 @@ import com.github.toastshaman.dropwizard.auth.jwt.exceptions.TokenExpiredExcepti
 import com.github.toastshaman.dropwizard.auth.jwt.hmac.HmacSHA512Verifier;
 import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
 import com.google.common.base.Strings;
+import com.google.common.io.BaseEncoding;
 import feign.FeignException;
 import io.dropwizard.primer.cache.TokenCacheManager;
 import io.dropwizard.primer.core.PrimerError;
@@ -146,15 +147,13 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                         Response.status(e.getStatus())
                                 .entity(PrimerError.builder().errorCode(e.getErrorCode()).message(e.getMessage()).build())
                                         .build());
-            } catch (NullPointerException e) {
+            } catch (Exception e) {
                 log.error("Primer error", e);
                 requestContext.abortWith(
                         Response.status(Response.Status.FORBIDDEN)
                                 .entity(PrimerError.builder().errorCode("PR002").message("Forbidden").build())
                                 .build());
-
             }
-
         }
     }
 
