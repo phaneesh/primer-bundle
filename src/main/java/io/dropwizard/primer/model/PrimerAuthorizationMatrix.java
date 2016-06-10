@@ -34,4 +34,8 @@ public class PrimerAuthorizationMatrix {
 
     @Singular
     List<PrimerAuthorization> authorizations;
+
+    @Singular
+    List<PrimerAuthorization> autoAuthorizations;
+
 }

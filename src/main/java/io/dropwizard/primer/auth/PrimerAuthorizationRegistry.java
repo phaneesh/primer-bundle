@@ -66,6 +66,11 @@ public class PrimerAuthorizationRegistry {
                 urlPatterns.add(pattern);
                 urlToAuthMap.put(pattern, auth);
             });
+            matrix.getAutoAuthorizations().forEach( auth -> {
+                final String pattern = generatePathExpression(auth.getUrl());
+                urlPatterns.add(pattern);
+                urlToAuthMap.put(pattern, auth);
+            });
             Collections.sort(urlPatterns, (o1, o2) -> tokenMatch.matcher(o2).groupCount() - tokenMatch.matcher(o1).groupCount());
             Collections.sort(urlPatterns, (o1, o2) -> o2.compareTo(o1));
             urlPatterns.forEach( pattern -> authList.put(pattern, urlToAuthMap.get(pattern)));
