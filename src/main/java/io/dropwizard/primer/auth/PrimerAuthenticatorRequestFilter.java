@@ -22,7 +22,6 @@ import com.github.toastshaman.dropwizard.auth.jwt.exceptions.TokenExpiredExcepti
 import com.github.toastshaman.dropwizard.auth.jwt.hmac.HmacSHA512Verifier;
 import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
 import com.google.common.base.Strings;
-import com.google.common.io.BaseEncoding;
 import feign.FeignException;
 import io.dropwizard.primer.cache.TokenCacheManager;
 import io.dropwizard.primer.core.PrimerError;
@@ -64,6 +63,10 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
     private PrimerBundleConfiguration configuration;
 
     private final Duration acceptableClockSkew;
+
+    private static final String AUTHORIZED_FOR_ID = "X-AUTHORIZED-FOR-ID";
+    private static final String AUTHORIZED_FOR_SUBJECT = "X-AUTHORIZED-FOR-SUBJECT";
+    private static final String AUTHORIZED_FOR_NAME = "X-AUTHORIZED-FOR-NAME";
 
     @Builder
     public PrimerAuthenticatorRequestFilter(final JsonWebTokenParser tokenParser,
@@ -120,6 +123,18 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                                     .entity(PrimerError.builder().errorCode("PR002").message("Unauthorized")
                                             .build()).build()
                     );
+                }
+                //Stamp authorization headers for downstream services which can use this to stop token forgery & misuse
+                final String tokenType = (String)webToken.claim().getParameter("type");
+                switch(tokenType) {
+                    case "dynamic":
+                        requestContext.getHeaders().putSingle(AUTHORIZED_FOR_ID, (String)webToken.claim().getParameter("user_id"));
+                        requestContext.getHeaders().putSingle(AUTHORIZED_FOR_SUBJECT, webToken.claim().subject());
+                        requestContext.getHeaders().putSingle(AUTHORIZED_FOR_NAME, (String)webToken.claim().getParameter("name"));
+                        break;
+                    case "static":
+                        requestContext.getHeaders().putSingle(AUTHORIZED_FOR_SUBJECT, webToken.claim().subject());
+                        break;
                 }
             } catch (TokenExpiredException e) {
                 log.error("Token Expiry Error", e);
