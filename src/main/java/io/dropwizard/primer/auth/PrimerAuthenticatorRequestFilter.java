@@ -179,7 +179,7 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
 
     private Optional<String> getToken(ContainerRequestContext requestContext) {
         final String header = requestContext.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-        log.info("Authorization Header: {}", header);
+        log.debug("Authorization Header: {}", header);
         if (header != null) {
             final String rawToken = header.replaceAll(configuration.getPrefix(), "").trim();
             if(Strings.isNullOrEmpty(rawToken)) {

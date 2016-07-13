@@ -16,12 +16,15 @@
 
 package io.dropwizard.primer.cache;
 
-import com.google.common.base.Optional;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
+import com.google.common.cache.CacheStats;
 import com.google.common.cache.LoadingCache;
 import io.dropwizard.primer.model.PrimerBundleConfiguration;
+import lombok.val;
 
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -37,18 +40,16 @@ public class TokenCacheManager {
 
     public static void init(final PrimerBundleConfiguration configuration) {
         blacklistCache = CacheBuilder.newBuilder()
-                .concurrencyLevel(32)
                 .maximumSize(configuration.getCacheMaxSize())
                 .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
                 .recordStats()
                 .build(new CacheLoader<String, Optional<Boolean>>() {
                     @Override
                     public Optional<Boolean> load(String key) throws Exception {
-                        return Optional.of(false);
+                        return java.util.Optional.of(false);
                     }
                 });
         lruCache = CacheBuilder.newBuilder()
-                .concurrencyLevel(32)
                 .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
                 .maximumSize(configuration.getCacheMaxSize())
                 .recordStats()
@@ -58,7 +59,6 @@ public class TokenCacheManager {
                         return Optional.of(false);
                     }
                 });
-
     }
 
     public static void blackList(String token) {
@@ -71,7 +71,12 @@ public class TokenCacheManager {
 
     public static boolean checkCache(String token) {
         try {
-            return lruCache.get(token).get();
+            val result = lruCache.get(token);
+            if(result.isPresent()) {
+                return result.get();
+            } else {
+                return false;
+            }
         } catch (ExecutionException e) {
             return false;
         }
@@ -79,6 +84,10 @@ public class TokenCacheManager {
 
     public static boolean checkBlackList(String token) throws ExecutionException {
         return blacklistCache.get(token).get();
+    }
+
+    public static CacheStats cacheStats() {
+        return lruCache.stats();
     }
 
 }
