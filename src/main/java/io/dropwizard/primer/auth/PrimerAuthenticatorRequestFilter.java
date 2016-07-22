@@ -139,23 +139,43 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                 );
             } catch (FeignException e) {
                 log.error("Feign error: {}", e.getMessage());
-                TokenCacheManager.blackList(token.get());
+                if(e.status() == Response.Status.FORBIDDEN.getStatusCode()) {
+                    TokenCacheManager.blackList(token.get());
+                }
+                else if(e.status() == Response.Status.NOT_FOUND.getStatusCode()) {
+                    requestContext.abortWith(
+                            Response.status(Response.Status.UNAUTHORIZED.getStatusCode())
+                                    .entity(PrimerError.builder().errorCode("PR002").message("Unauthorized")
+                                            .build()).build()
+                    );
+                    return;
+                }
                 requestContext.abortWith(
-                        Response.status(Response.Status.UNAUTHORIZED.getStatusCode())
+                        Response.status(e.status())
                                 .entity(PrimerError.builder().errorCode("PR002").message("Unauthorized")
                                         .build()).build()
                 );
             } catch (PrimerException e) {
                 log.error("Primer error: {}", e.getMessage());
-                TokenCacheManager.blackList(token.get());
+                if(e.getStatus() == Response.Status.FORBIDDEN.getStatusCode()) {
+                    TokenCacheManager.blackList(token.get());
+                }
+                else if(e.getStatus() == Response.Status.NOT_FOUND.getStatusCode()) {
+                    requestContext.abortWith(
+                            Response.status(Response.Status.UNAUTHORIZED.getStatusCode())
+                                    .entity(PrimerError.builder().errorCode("PR002").message("Unauthorized")
+                                            .build()).build()
+                    );
+                    return;
+                }
                 requestContext.abortWith(
-                        Response.status(Response.Status.UNAUTHORIZED.getStatusCode())
+                        Response.status(e.getStatus())
                                 .entity(PrimerError.builder().errorCode("PR002").message("Unauthorized")
                                         .build()).build());
             } catch (Exception e) {
                 log.error("General error: {}", e.getMessage());
                 requestContext.abortWith(
-                        Response.status(Response.Status.UNAUTHORIZED)
+                        Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                                 .entity(PrimerError.builder().errorCode("PR002").message("Unauthorized").build())
                                 .build());
             }
