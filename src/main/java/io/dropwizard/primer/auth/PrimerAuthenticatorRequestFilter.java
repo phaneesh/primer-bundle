@@ -106,6 +106,10 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                     return;
                 }
                 if(TokenCacheManager.checkCache(token.get())) {
+                    final JsonWebToken cachedToken = tokenParser.parse(token.get());
+                    //Stamp authorization headers for downstream services which can
+                    // use this to stop token forgery & misuse
+                    stampHeaders(requestContext, cachedToken);
                     //Short circuit for optimization
                     return;
                 }
@@ -125,17 +129,7 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                     );
                 }
                 //Stamp authorization headers for downstream services which can use this to stop token forgery & misuse
-                final String tokenType = (String)webToken.claim().getParameter("type");
-                switch(tokenType) {
-                    case "dynamic":
-                        requestContext.getHeaders().add(AUTHORIZED_FOR_ID, (String)webToken.claim().getParameter("user_id"));
-                        requestContext.getHeaders().add(AUTHORIZED_FOR_SUBJECT, webToken.claim().subject());
-                        requestContext.getHeaders().add(AUTHORIZED_FOR_NAME, (String)webToken.claim().getParameter("name"));
-                        break;
-                    case "static":
-                        requestContext.getHeaders().add(AUTHORIZED_FOR_SUBJECT, webToken.claim().subject());
-                        break;
-                }
+                stampHeaders(requestContext, webToken);
             } catch (TokenExpiredException e) {
                 log.error("Token Expiry Error", e);
                 requestContext.abortWith(
@@ -220,5 +214,21 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
             return null;
         }
         return new Instant(input * 1000);
+    }
+
+    private void stampHeaders(ContainerRequestContext requestContext, JsonWebToken webToken) {
+        final String tokenType = (String)webToken.claim().getParameter("type");
+        switch(tokenType) {
+            case "dynamic":
+                requestContext.getHeaders().putSingle(AUTHORIZED_FOR_ID, (String)webToken.claim().getParameter("user_id"));
+                requestContext.getHeaders().putSingle(AUTHORIZED_FOR_SUBJECT, webToken.claim().subject());
+                requestContext.getHeaders().putSingle(AUTHORIZED_FOR_NAME, (String)webToken.claim().getParameter("name"));
+                break;
+            case "static":
+                requestContext.getHeaders().putSingle(AUTHORIZED_FOR_SUBJECT, webToken.claim().subject());
+                break;
+            default:
+                log.warn("No auth header stamped for type: {}", tokenType);
+        }
     }
 }

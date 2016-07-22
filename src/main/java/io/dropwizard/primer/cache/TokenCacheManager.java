@@ -16,14 +16,11 @@
 
 package io.dropwizard.primer.cache;
 
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.CacheStats;
-import com.google.common.cache.LoadingCache;
+import com.google.common.cache.*;
 import io.dropwizard.primer.model.PrimerBundleConfiguration;
+import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -31,6 +28,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * @author phaneesh
  */
+@Slf4j
 public class TokenCacheManager {
 
 
@@ -42,6 +40,7 @@ public class TokenCacheManager {
         blacklistCache = CacheBuilder.newBuilder()
                 .maximumSize(configuration.getCacheMaxSize())
                 .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
+                .removalListener((RemovalListener<String, Optional<Boolean>>) notification -> log.info("Blacklisted Token Evicted: " +notification.getKey()))
                 .recordStats()
                 .build(new CacheLoader<String, Optional<Boolean>>() {
                     @Override
@@ -51,6 +50,7 @@ public class TokenCacheManager {
                 });
         lruCache = CacheBuilder.newBuilder()
                 .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
+                .removalListener((RemovalListener<String, Optional<Boolean>>) notification -> log.info("Token Evicted: " +notification.getKey()))
                 .maximumSize(configuration.getCacheMaxSize())
                 .recordStats()
                 .build(new CacheLoader<String, Optional<Boolean>>() {
