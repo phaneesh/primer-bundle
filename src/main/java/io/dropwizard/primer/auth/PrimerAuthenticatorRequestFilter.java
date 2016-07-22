@@ -100,7 +100,7 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                 if(TokenCacheManager.checkBlackList(token.get())) {
                     requestContext.abortWith(
                             Response.status(Response.Status.FORBIDDEN)
-                                    .entity(PrimerError.builder().errorCode("PR002").message("Forbidden")
+                                    .entity(PrimerError.builder().errorCode("PR001").message("Forbidden")
                                             .build()).build()
                     );
                     return;
@@ -143,8 +143,8 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                     TokenCacheManager.blackList(token.get());
                 }
                 requestContext.abortWith(
-                        Response.status(e.status())
-                                .entity(PrimerError.builder().errorCode("PR000").message("Error")
+                        Response.status(Response.Status.UNAUTHORIZED.getStatusCode())
+                                .entity(PrimerError.builder().errorCode("PR002").message("Unauthorized")
                                         .build()).build()
                 );
             } catch (PrimerException e) {
@@ -160,7 +160,7 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                 log.error("Primer error", e);
                 requestContext.abortWith(
                         Response.status(Response.Status.FORBIDDEN)
-                                .entity(PrimerError.builder().errorCode("PR002").message("Forbidden").build())
+                                .entity(PrimerError.builder().errorCode("PR001").message("Forbidden").build())
                                 .build());
             }
         }
