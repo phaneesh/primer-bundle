@@ -131,14 +131,14 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                 //Stamp authorization headers for downstream services which can use this to stop token forgery & misuse
                 stampHeaders(requestContext, webToken);
             } catch (TokenExpiredException e) {
-                log.error("Token Expiry Error", e);
+                log.error("Token Expiry Error: {}", e.getMessage());
                 requestContext.abortWith(
                         Response.status(Response.Status.PRECONDITION_FAILED)
                                 .entity(PrimerError.builder().errorCode("PR003").message("Expired")
                                         .build()).build()
                 );
             } catch (FeignException e) {
-                log.error("Feign error", e);
+                log.error("Feign error: {}", e.getMessage());
                 TokenCacheManager.blackList(token.get());
                 requestContext.abortWith(
                         Response.status(Response.Status.UNAUTHORIZED.getStatusCode())
@@ -146,14 +146,14 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                                         .build()).build()
                 );
             } catch (PrimerException e) {
-                log.error("Primer error", e);
+                log.error("Primer error: {}", e.getMessage());
                 TokenCacheManager.blackList(token.get());
                 requestContext.abortWith(
                         Response.status(Response.Status.UNAUTHORIZED.getStatusCode())
                                 .entity(PrimerError.builder().errorCode("PR002").message("Unauthorized")
                                         .build()).build());
             } catch (Exception e) {
-                log.error("General error", e);
+                log.error("General error: {}", e.getMessage());
                 requestContext.abortWith(
                         Response.status(Response.Status.UNAUTHORIZED)
                                 .entity(PrimerError.builder().errorCode("PR002").message("Unauthorized").build())
