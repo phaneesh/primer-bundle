@@ -139,9 +139,7 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                 );
             } catch (FeignException e) {
                 log.error("Feign error", e);
-                if(e.status() == Response.Status.FORBIDDEN.getStatusCode()) {
-                    TokenCacheManager.blackList(token.get());
-                }
+                TokenCacheManager.blackList(token.get());
                 requestContext.abortWith(
                         Response.status(Response.Status.UNAUTHORIZED.getStatusCode())
                                 .entity(PrimerError.builder().errorCode("PR002").message("Unauthorized")
@@ -149,18 +147,16 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                 );
             } catch (PrimerException e) {
                 log.error("Primer error", e);
-                if(e.getStatus() == Response.Status.FORBIDDEN.getStatusCode()) {
-                    TokenCacheManager.blackList(token.get());
-                }
+                TokenCacheManager.blackList(token.get());
                 requestContext.abortWith(
-                        Response.status(e.getStatus())
-                                .entity(PrimerError.builder().errorCode(e.getErrorCode()).message(e.getMessage()).build())
-                                        .build());
+                        Response.status(Response.Status.UNAUTHORIZED.getStatusCode())
+                                .entity(PrimerError.builder().errorCode("PR002").message("Unauthorized")
+                                        .build()).build());
             } catch (Exception e) {
-                log.error("Primer error", e);
+                log.error("General error", e);
                 requestContext.abortWith(
-                        Response.status(Response.Status.FORBIDDEN)
-                                .entity(PrimerError.builder().errorCode("PR001").message("Forbidden").build())
+                        Response.status(Response.Status.UNAUTHORIZED)
+                                .entity(PrimerError.builder().errorCode("PR002").message("Unauthorized").build())
                                 .build());
             }
         }
