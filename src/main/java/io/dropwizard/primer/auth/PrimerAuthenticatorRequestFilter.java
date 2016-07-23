@@ -139,25 +139,15 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                 );
             } catch (FeignException e) {
                 log.error("Feign error: {}", e.getMessage());
-                TokenCacheManager.blackList(token.get());
-                requestContext.abortWith(
-                        Response.status(Response.Status.UNAUTHORIZED.getStatusCode())
-                                .entity(PrimerError.builder().errorCode("PR002").message("Unauthorized")
-                                        .build()).build()
-                );
+                handleError(Response.Status.fromStatusCode(e.status()), "PR000", e.getMessage(),
+                        requestContext, token.get());
             } catch (PrimerException e) {
                 log.error("Primer error: {}", e.getMessage());
-                TokenCacheManager.blackList(token.get());
-                requestContext.abortWith(
-                        Response.status(Response.Status.UNAUTHORIZED.getStatusCode())
-                                .entity(PrimerError.builder().errorCode("PR002").message("Unauthorized")
-                                        .build()).build());
+                handleError(Response.Status.fromStatusCode(e.getStatus()), e.getErrorCode(), e.getMessage(),
+                        requestContext, token.get());
             } catch (Exception e) {
                 log.error("General error: {}", e.getMessage());
-                requestContext.abortWith(
-                        Response.status(Response.Status.UNAUTHORIZED)
-                                .entity(PrimerError.builder().errorCode("PR002").message("Unauthorized").build())
-                                .build());
+                handleError(Response.Status.INTERNAL_SERVER_ERROR, "PR000", "Error", requestContext, token.get());
             }
         }
     }
@@ -225,6 +215,31 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                 break;
             default:
                 log.warn("No auth header stamped for type: {}", tokenType);
+        }
+    }
+
+    private void handleError(Response.Status status, String errorCode, String message, ContainerRequestContext requestContext,
+                             String token) {
+        switch(status) {
+            case NOT_FOUND:
+                requestContext.abortWith(
+                        Response.status(Response.Status.UNAUTHORIZED.getStatusCode())
+                                .entity(PrimerError.builder().errorCode("PR002").message("Unauthorized")
+                                        .build()).build());
+                break;
+            case FORBIDDEN:
+            case UNAUTHORIZED:
+                TokenCacheManager.blackList(token);
+                requestContext.abortWith(
+                        Response.status(status)
+                                .entity(PrimerError.builder().errorCode(errorCode).message(message).build())
+                                .build());
+                break;
+            default:
+                requestContext.abortWith(
+                        Response.status(status)
+                                .entity(PrimerError.builder().errorCode(errorCode).message(message).build())
+                                .build());
         }
     }
 }
