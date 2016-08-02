@@ -18,6 +18,8 @@ package io.dropwizard.primer.auth;
 
 import com.codahale.metrics.annotation.Metered;
 import com.github.toastshaman.dropwizard.auth.jwt.JsonWebTokenParser;
+import com.github.toastshaman.dropwizard.auth.jwt.exceptions.InvalidSignatureException;
+import com.github.toastshaman.dropwizard.auth.jwt.exceptions.MalformedJsonWebTokenException;
 import com.github.toastshaman.dropwizard.auth.jwt.exceptions.TokenExpiredException;
 import com.github.toastshaman.dropwizard.auth.jwt.hmac.HmacSHA512Verifier;
 import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
@@ -135,6 +137,20 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                 requestContext.abortWith(
                         Response.status(Response.Status.PRECONDITION_FAILED)
                                 .entity(PrimerError.builder().errorCode("PR003").message("Expired")
+                                        .build()).build()
+                );
+            } catch (MalformedJsonWebTokenException e) {
+                log.error("Token Malformed Error: {}", e.getMessage());
+                requestContext.abortWith(
+                        Response.status(Response.Status.UNAUTHORIZED)
+                                .entity(PrimerError.builder().errorCode("PR002").message("Unauthorized")
+                                        .build()).build()
+                );
+            } catch (InvalidSignatureException e) {
+                log.error("Token Signature Error: {}", e.getMessage());
+                requestContext.abortWith(
+                        Response.status(Response.Status.UNAUTHORIZED)
+                                .entity(PrimerError.builder().errorCode("PR002").message("Unauthorized")
                                         .build()).build()
                 );
             } catch (FeignException e) {
