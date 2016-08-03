@@ -36,14 +36,11 @@ import org.junit.Rule;
 import org.junit.Test;
 
 import javax.ws.rs.core.Response;
-
 import java.io.IOException;
 import java.time.Instant;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 /**
  * @author phaneesh

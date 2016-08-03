@@ -18,6 +18,7 @@ package io.dropwizard.primer.model;
 import lombok.*;
 import org.hibernate.validator.constraints.NotBlank;
 import org.hibernate.validator.constraints.NotEmpty;
+
 import java.util.Set;
 
 /**

@@ -17,15 +17,10 @@
 package io.dropwizard.primer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
-import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebTokenClaim;
-import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebTokenHeader;
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
 import io.dropwizard.primer.auth.PrimerAuthorizationRegistry;
 import io.dropwizard.primer.core.VerifyResponse;
 import io.dropwizard.primer.exception.PrimerException;
-import org.joda.time.DateTime;
-import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 

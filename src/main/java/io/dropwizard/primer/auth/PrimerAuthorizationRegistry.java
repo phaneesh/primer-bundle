@@ -17,8 +17,6 @@
 package io.dropwizard.primer.auth;
 
 import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
-import com.google.common.base.Charsets;
-import com.google.common.hash.Hashing;
 import io.dropwizard.primer.PrimerBundle;
 import io.dropwizard.primer.cache.TokenCacheManager;
 import io.dropwizard.primer.core.ServiceUser;
@@ -32,9 +30,7 @@ import lombok.val;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.*;
-import java.util.function.Predicate;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * @author phaneesh
