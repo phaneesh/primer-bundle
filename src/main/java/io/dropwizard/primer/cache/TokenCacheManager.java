@@ -40,7 +40,11 @@ public class TokenCacheManager {
         blacklistCache = CacheBuilder.newBuilder()
                 .maximumSize(configuration.getCacheMaxSize())
                 .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
-                .removalListener((RemovalListener<String, Optional<Boolean>>) notification -> log.debug("Blacklisted Token Evicted: " +notification.getKey()))
+                .removalListener((RemovalListener<String, Optional<Boolean>>) notification -> {
+                    if (log.isDebugEnabled()) {
+                        log.debug("Blacklisted Token Evicted: {}", notification.getKey());
+                    }
+                })
                 .recordStats()
                 .build(new CacheLoader<String, Optional<Boolean>>() {
                     @Override
@@ -50,7 +54,11 @@ public class TokenCacheManager {
                 });
         lruCache = CacheBuilder.newBuilder()
                 .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
-                .removalListener((RemovalListener<String, Optional<Boolean>>) notification -> log.debug("Token Evicted: " +notification.getKey()))
+                .removalListener((RemovalListener<String, Optional<Boolean>>) notification -> {
+                    if(log.isDebugEnabled()) {
+                        log.debug("Token Evicted: " + notification.getKey());
+                    }
+                })
                 .maximumSize(configuration.getCacheMaxSize())
                 .recordStats()
                 .build(new CacheLoader<String, Optional<Boolean>>() {
@@ -72,7 +80,7 @@ public class TokenCacheManager {
     public static boolean checkCache(String token) {
         try {
             val result = lruCache.get(token);
-            if(result.isPresent()) {
+            if (result.isPresent()) {
                 return result.get();
             } else {
                 return false;
