@@ -40,7 +40,7 @@ public class TokenCacheManager {
         blacklistCache = CacheBuilder.newBuilder()
                 .maximumSize(configuration.getCacheMaxSize())
                 .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
-                .removalListener((RemovalListener<String, Optional<Boolean>>) notification -> log.info("Blacklisted Token Evicted: " +notification.getKey()))
+                .removalListener((RemovalListener<String, Optional<Boolean>>) notification -> log.debug("Blacklisted Token Evicted: " +notification.getKey()))
                 .recordStats()
                 .build(new CacheLoader<String, Optional<Boolean>>() {
                     @Override
@@ -50,7 +50,7 @@ public class TokenCacheManager {
                 });
         lruCache = CacheBuilder.newBuilder()
                 .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
-                .removalListener((RemovalListener<String, Optional<Boolean>>) notification -> log.info("Token Evicted: " +notification.getKey()))
+                .removalListener((RemovalListener<String, Optional<Boolean>>) notification -> log.debug("Token Evicted: " +notification.getKey()))
                 .maximumSize(configuration.getCacheMaxSize())
                 .recordStats()
                 .build(new CacheLoader<String, Optional<Boolean>>() {
