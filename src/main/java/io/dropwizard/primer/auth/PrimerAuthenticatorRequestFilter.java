@@ -17,6 +17,8 @@
 package io.dropwizard.primer.auth;
 
 import com.codahale.metrics.annotation.Metered;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.toastshaman.dropwizard.auth.jwt.JsonWebTokenParser;
 import com.github.toastshaman.dropwizard.auth.jwt.exceptions.InvalidSignatureException;
 import com.github.toastshaman.dropwizard.auth.jwt.exceptions.MalformedJsonWebTokenException;
@@ -66,6 +68,8 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
 
     private final Duration acceptableClockSkew;
 
+    private ObjectMapper objectMapper;
+
     private static final String AUTHORIZED_FOR_ID = "X-AUTHORIZED-FOR-ID";
     private static final String AUTHORIZED_FOR_SUBJECT = "X-AUTHORIZED-FOR-SUBJECT";
     private static final String AUTHORIZED_FOR_NAME = "X-AUTHORIZED-FOR-NAME";
@@ -73,11 +77,12 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
     @Builder
     public PrimerAuthenticatorRequestFilter(final JsonWebTokenParser tokenParser,
                                             final HmacSHA512Verifier verifier,
-                                            final PrimerBundleConfiguration configuration) {
+                                            final PrimerBundleConfiguration configuration, final ObjectMapper objectMapper) {
         this.tokenParser = tokenParser;
         this.verifier = verifier;
         this.configuration = configuration;
         this.acceptableClockSkew = new Duration(configuration.getClockSkew());
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -94,16 +99,16 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
         if(!token.isPresent()) {
             requestContext.abortWith(
                     Response.status(Response.Status.BAD_REQUEST)
-                            .entity(PrimerError.builder().errorCode("PR000").message("Bad request")
-                    .build()).build()
+                            .entity(objectMapper.writeValueAsBytes(PrimerError.builder().errorCode("PR000").message("Bad request")
+                                    .build())).build()
             );
         } else {
             try {
                 if(TokenCacheManager.checkBlackList(token.get())) {
                     requestContext.abortWith(
                             Response.status(Response.Status.FORBIDDEN)
-                                    .entity(PrimerError.builder().errorCode("PR001").message("Forbidden")
-                                            .build()).build()
+                                    .entity(objectMapper.writeValueAsBytes(PrimerError.builder().errorCode("PR001").message("Forbidden")
+                                            .build())).build()
                     );
                     return;
                 }
@@ -126,8 +131,8 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                 if(!isAuthorized) {
                     requestContext.abortWith(
                             Response.status(Response.Status.UNAUTHORIZED)
-                                    .entity(PrimerError.builder().errorCode("PR002").message("Unauthorized")
-                                            .build()).build()
+                                    .entity(objectMapper.writeValueAsBytes(PrimerError.builder().errorCode("PR002").message("Unauthorized")
+                                            .build())).build()
                     );
                 }
                 //Stamp authorization headers for downstream services which can use this to stop token forgery & misuse
@@ -136,22 +141,22 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                 log.error("Token Expiry Error: {}", e.getMessage());
                 requestContext.abortWith(
                         Response.status(Response.Status.PRECONDITION_FAILED)
-                                .entity(PrimerError.builder().errorCode("PR003").message("Expired")
-                                        .build()).build()
+                                .entity(objectMapper.writeValueAsBytes(PrimerError.builder().errorCode("PR003").message("Expired")
+                                        .build())).build()
                 );
             } catch (MalformedJsonWebTokenException e) {
                 log.error("Token Malformed Error: {}", e.getMessage());
                 requestContext.abortWith(
                         Response.status(Response.Status.UNAUTHORIZED)
-                                .entity(PrimerError.builder().errorCode("PR002").message("Unauthorized")
-                                        .build()).build()
+                                .entity(objectMapper.writeValueAsBytes(PrimerError.builder().errorCode("PR002").message("Unauthorized")
+                                        .build())).build()
                 );
             } catch (InvalidSignatureException e) {
                 log.error("Token Signature Error: {}", e.getMessage());
                 requestContext.abortWith(
                         Response.status(Response.Status.UNAUTHORIZED)
-                                .entity(PrimerError.builder().errorCode("PR002").message("Unauthorized")
-                                        .build()).build()
+                                .entity(objectMapper.writeValueAsBytes(PrimerError.builder().errorCode("PR002").message("Unauthorized")
+                                        .build())).build()
                 );
             } catch (FeignException e) {
                 log.error("Feign error: {}", e.getMessage());
@@ -198,7 +203,6 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
             final Instant issuedAt = fromNullable(toInstant(token.claim().issuedAt())).or(now);
             final Instant expiration = fromNullable(toInstant(token.claim().expiration())).or(new Instant(Long.MAX_VALUE));
             final Instant notBefore = fromNullable(toInstant(token.claim().notBefore())).or(now);
-
             if (issuedAt.isAfter(expiration) || notBefore.isAfterNow() || !inInterval(issuedAt, expiration, now)) {
                 throw new TokenExpiredException();
             }
@@ -235,26 +239,27 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
     }
 
     private void handleError(Response.Status status, String errorCode, String message, ContainerRequestContext requestContext,
-                             String token) {
+                             String token) throws JsonProcessingException {
         switch(status) {
             case NOT_FOUND:
                 requestContext.abortWith(
                         Response.status(Response.Status.UNAUTHORIZED.getStatusCode())
-                                .entity(PrimerError.builder().errorCode("PR002").message("Unauthorized")
-                                        .build()).build());
+                                .entity(objectMapper.writeValueAsBytes(PrimerError.builder().errorCode("PR002").message("Unauthorized")
+                                        .build())).build());
                 break;
             case FORBIDDEN:
             case UNAUTHORIZED:
                 TokenCacheManager.blackList(token);
                 requestContext.abortWith(
                         Response.status(status)
-                                .entity(PrimerError.builder().errorCode(errorCode).message(message).build())
+                                .entity(objectMapper.writeValueAsBytes(PrimerError.builder().errorCode(errorCode).message(message).build()))
                                 .build());
                 break;
             default:
                 requestContext.abortWith(
                         Response.status(status)
-                                .entity(PrimerError.builder().errorCode(errorCode).message(message).build())
+                                .entity(objectMapper.writeValueAsBytes(
+                                        PrimerError.builder().errorCode(errorCode).message(message).build()))
                                 .build());
         }
     }

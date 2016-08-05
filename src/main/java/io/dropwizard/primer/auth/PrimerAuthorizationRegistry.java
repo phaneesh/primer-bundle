@@ -82,17 +82,15 @@ public class PrimerAuthorizationRegistry {
 
     public static boolean authorize(final String path, final String role, final String method, final String token,
                                     final JsonWebToken jsonWebToken) throws PrimerException {
-        if(TokenCacheManager.checkCache(token)) {
-            return true;
-        }
-
         val index = urlPatterns.stream().filter(path::matches).findFirst();
         if(!index.isPresent())
             return false;
-
         //Short circuit for method auth failure
         if(!isAuthorized(index.get(), method, role))
             return false;
+        if(TokenCacheManager.checkCache(token)) {
+            return true;
+        }
         switch (authList.get(index.get()).getType()) {
             case "dynamic":
                 return verify(jsonWebToken, token, "dynamic");

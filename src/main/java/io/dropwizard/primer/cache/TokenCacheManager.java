@@ -16,7 +16,9 @@
 
 package io.dropwizard.primer.cache;
 
-import com.google.common.cache.*;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.guava.CaffeinatedGuava;
+import com.google.common.cache.LoadingCache;
 import io.dropwizard.primer.model.PrimerBundleConfiguration;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
@@ -37,36 +39,14 @@ public class TokenCacheManager {
     private static LoadingCache<String, Optional<Boolean>> lruCache;
 
     public static void init(final PrimerBundleConfiguration configuration) {
-        blacklistCache = CacheBuilder.newBuilder()
-                .maximumSize(configuration.getCacheMaxSize())
-                .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
-                .removalListener((RemovalListener<String, Optional<Boolean>>) notification -> {
-                    if (log.isDebugEnabled()) {
-                        log.debug("Blacklisted Token Evicted: {}", notification.getKey());
-                    }
-                })
-                .recordStats()
-                .build(new CacheLoader<String, Optional<Boolean>>() {
-                    @Override
-                    public Optional<Boolean> load(String key) throws Exception {
-                        return java.util.Optional.of(false);
-                    }
-                });
-        lruCache = CacheBuilder.newBuilder()
-                .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
-                .removalListener((RemovalListener<String, Optional<Boolean>>) notification -> {
-                    if(log.isDebugEnabled()) {
-                        log.debug("Token Evicted: " + notification.getKey());
-                    }
-                })
-                .maximumSize(configuration.getCacheMaxSize())
-                .recordStats()
-                .build(new CacheLoader<String, Optional<Boolean>>() {
-                    @Override
-                    public Optional<Boolean> load(String key) throws Exception {
-                        return Optional.of(false);
-                    }
-                });
+        blacklistCache = CaffeinatedGuava.build(
+                Caffeine.newBuilder()
+                        .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
+                        .maximumSize(configuration.getCacheMaxSize()), s -> Optional.of(false));
+        lruCache = CaffeinatedGuava.build(
+                Caffeine.newBuilder()
+                        .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
+                        .maximumSize(configuration.getCacheMaxSize()), s -> Optional.of(false));
     }
 
     public static void blackList(String token) {
@@ -93,9 +73,4 @@ public class TokenCacheManager {
     public static boolean checkBlackList(String token) throws ExecutionException {
         return blacklistCache.get(token).get();
     }
-
-    public static CacheStats cacheStats() {
-        return lruCache.stats();
-    }
-
 }
