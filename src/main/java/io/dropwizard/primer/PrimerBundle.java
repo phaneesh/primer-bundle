@@ -156,6 +156,7 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
                 .configuration(getPrimerConfiguration(configuration))
                 .tokenParser(tokenParser)
                 .verifier(tokenVerifier)
+                .objectMapper(environment.getObjectMapper())
                 .build());
     }
 
