@@ -19,9 +19,10 @@ package io.dropwizard.primer.auth;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.guava.CaffeinatedGuava;
 import com.github.toastshaman.dropwizard.auth.jwt.JsonWebTokenParser;
-import com.github.toastshaman.dropwizard.auth.jwt.exceptions.TokenExpiredException;
 import com.github.toastshaman.dropwizard.auth.jwt.hmac.HmacSHA512Verifier;
 import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
+import com.github.toastshaman.dropwizard.auth.jwt.validator.ExpiryValidator;
+import com.google.common.base.Strings;
 import com.google.common.cache.LoadingCache;
 import io.dropwizard.primer.PrimerBundle;
 import io.dropwizard.primer.core.ServiceUser;
@@ -33,17 +34,12 @@ import io.dropwizard.primer.model.PrimerAuthorizationMatrix;
 import io.dropwizard.primer.model.PrimerBundleConfiguration;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
-import org.apache.commons.lang3.StringUtils;
 import org.joda.time.Duration;
-import org.joda.time.Instant;
-import org.joda.time.Interval;
 
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
-
-import static com.google.common.base.Optional.fromNullable;
 
 /**
  * @author phaneesh
@@ -61,10 +57,9 @@ public class PrimerAuthorizationRegistry {
 
     private static LoadingCache<TokenKey, JsonWebToken> lruCache;
 
-    private static Duration acceptableClockSkew;
-
     private static JsonWebTokenParser parser;
     private static HmacSHA512Verifier verifier;
+    private static ExpiryValidator expiryValidator;
 
 
     public static void init(PrimerAuthorizationMatrix matrix,
@@ -100,7 +95,6 @@ public class PrimerAuthorizationRegistry {
         whiteListUrls.forEach(url -> whiteList.add(generatePathExpression(url)));
         Collections.sort(whiteList, (o1, o2) -> tokenMatch.matcher(o2).groupCount() - tokenMatch.matcher(o1).groupCount());
         Collections.sort(whiteList, (o1, o2) -> o2.compareTo(o1));
-        acceptableClockSkew = new Duration(configuration.getClockSkew());
         blacklistCache = CaffeinatedGuava.build(
                 Caffeine.newBuilder()
                         .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
@@ -109,6 +103,7 @@ public class PrimerAuthorizationRegistry {
                 Caffeine.newBuilder()
                         .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
                         .maximumSize(configuration.getCacheMaxSize()), PrimerAuthorizationRegistry::verifyToken);
+        expiryValidator = new ExpiryValidator(new Duration(configuration.getClockSkew()));
     }
 
     private static String generatePathExpression(final String path) {
@@ -140,7 +135,7 @@ public class PrimerAuthorizationRegistry {
                 return verifyStatic(webToken, token);
         }
         throw PrimerException.builder()
-                .errorCode("PR002")
+                .errorCode("PR004")
                 .message("Unauthorized")
                 .status(401)
                 .build();
@@ -157,11 +152,11 @@ public class PrimerAuthorizationRegistry {
                         .role((String) webToken.claim().getParameter("role"))
                         .build()
         );
-        val result = (!StringUtils.isBlank(verifyResponse.getToken()) && !StringUtils.isBlank(verifyResponse.getUserId()));
+        val result = (!Strings.isNullOrEmpty(verifyResponse.getToken()) && !Strings.isNullOrEmpty(verifyResponse.getUserId()));
         if (!result) {
             blacklist(token);
             throw PrimerException.builder()
-                    .errorCode("PR002")
+                    .errorCode("PR004")
                     .message("Unauthorized")
                     .status(401)
                     .build();
@@ -172,11 +167,11 @@ public class PrimerAuthorizationRegistry {
     private static JsonWebToken verifyStatic(JsonWebToken webToken, String token) throws PrimerException {
         final VerifyStaticResponse verifyStaticResponse = PrimerBundle.getPrimerClient().verify(webToken.claim().issuer(),
                 webToken.claim().subject(), token, (String) webToken.claim().getParameter("role"));
-        val result = (!StringUtils.isBlank(verifyStaticResponse.getToken()) && !StringUtils.isBlank(verifyStaticResponse.getId()));
+        val result = (!Strings.isNullOrEmpty(verifyStaticResponse.getToken()) && !Strings.isNullOrEmpty(verifyStaticResponse.getId()));
         if (!result) {
             blacklist(token);
             throw PrimerException.builder()
-                    .errorCode("PR002")
+                    .errorCode("PR004")
                     .message("Unauthorized")
                     .status(401)
                     .build();
@@ -184,34 +179,22 @@ public class PrimerAuthorizationRegistry {
         return webToken;
     }
 
-    private static void checkExpiry(JsonWebToken token) {
-        if (token.claim() != null) {
-            final Instant now = new Instant();
-            final Instant issuedAt = fromNullable(toInstant(token.claim().issuedAt())).or(now);
-            final Instant expiration = fromNullable(toInstant(token.claim().expiration())).or(new Instant(Long.MAX_VALUE));
-            final Instant notBefore = fromNullable(toInstant(token.claim().notBefore())).or(now);
-            if (issuedAt.isAfter(expiration) || notBefore.isAfterNow() || !inInterval(issuedAt, expiration, now)) {
-                throw new TokenExpiredException();
-            }
-        }
-    }
-
     private static JsonWebToken verifyToken(TokenKey tokenKey) throws PrimerException {
         final JsonWebToken webToken = parser.parse(tokenKey.getToken());
         verifier.verifySignature(webToken);
-        checkExpiry(webToken);
+        expiryValidator.validate(webToken);
         final String role = (String) webToken.claim().getParameter("role");
         val index = urlPatterns.stream().filter(tokenKey.getPath()::matches).findFirst();
         if (!index.isPresent())
             throw PrimerException.builder()
-                    .errorCode("PR001")
+                    .errorCode("PR004")
                     .message("Unauthorized")
                     .status(401)
                     .build();
         //Short circuit for method auth failure
         if (!isAuthorized(index.get(), tokenKey.getMethod(), role))
             throw PrimerException.builder()
-                    .errorCode("PR001")
+                    .errorCode("PR004")
                     .message("Unauthorized")
                     .status(401)
                     .build();
@@ -225,27 +208,14 @@ public class PrimerAuthorizationRegistry {
                 return verify(webToken, tokenKey.getToken(), type);
             default:
                 throw PrimerException.builder()
-                        .errorCode("PR001")
+                        .errorCode("PR004")
                         .message("Unauthorized")
                         .status(401)
                         .build();
         }
     }
 
-    private static boolean inInterval(Instant start, Instant end, Instant now) {
-        final Interval interval = new Interval(start, end);
-        final Interval currentTimeWithSkew = new Interval(now.minus(acceptableClockSkew), now.plus(acceptableClockSkew));
-        return interval.overlaps(currentTimeWithSkew);
-    }
-
-    private static Instant toInstant(Long input) {
-        if (input == null) {
-            return null;
-        }
-        return new Instant(input * 1000);
-    }
-
-    public static void blacklist(String token) {
+    static void blacklist(String token) {
         blacklistCache.put(token, Optional.of(true));
     }
 

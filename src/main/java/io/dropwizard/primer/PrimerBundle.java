@@ -100,8 +100,9 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
     public void run(T configuration, Environment environment) throws Exception {
         final val primerConfig = getPrimerConfiguration(configuration);
         final JsonWebTokenParser tokenParser = new DefaultJsonWebTokenParser();
-        final byte[] secretKey = getPrimerConfiguration(configuration).getPrivateKey().getBytes(StandardCharsets.UTF_8);
+        final byte[] secretKey = primerConfig.getPrivateKey().getBytes(StandardCharsets.UTF_8);
         final HmacSHA512Verifier tokenVerifier = new HmacSHA512Verifier(secretKey);
+
         initializeAuthorization(configuration, tokenParser, tokenVerifier);
         final JacksonDecoder decoder = new JacksonDecoder();
         final JacksonEncoder encoder = new JacksonEncoder();
