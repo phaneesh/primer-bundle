@@ -18,6 +18,7 @@ package io.dropwizard.primer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import io.dropwizard.primer.auth.PrimerAuthorizationRegistry;
 import io.dropwizard.primer.core.VerifyResponse;
 import io.dropwizard.primer.exception.PrimerException;
@@ -25,10 +26,11 @@ import org.junit.Rule;
 import org.junit.Test;
 
 import java.time.Instant;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 /**
  * @author phaneesh
@@ -49,7 +51,7 @@ public class PerimerAuthorizationsTest extends BaseTest {
     }
 
     @Test
-    public void testAuthorizedCall() throws PrimerException, JsonProcessingException {
+    public void testAuthorizedCall() throws PrimerException, JsonProcessingException, ExecutionException {
             stubFor(post(urlEqualTo("/v1/verify/test/test"))
                     .willReturn(aResponse()
                             .withStatus(200)
@@ -59,26 +61,59 @@ public class PerimerAuthorizationsTest extends BaseTest {
                                     .token(token)
                                     .userId("test")
                                     .build()))));
-        assertTrue(PrimerAuthorizationRegistry.authorize("simple/auth/test", "test", "GET", token, webToken));
+        assertNotNull(PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", token));
     }
 
     @Test
-    public void testUnAuthorizedCallWithInvalidRole() throws PrimerException {
-        assertFalse(PrimerAuthorizationRegistry.authorize("simple/auth/test", "invalid", "GET", token, webToken));
+    public void testUnAuthorizedCallWithInvalidRole() throws PrimerException, ExecutionException {
+        try {
+            PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", token);
+            fail("Should have failed!!");
+        } catch (UncheckedExecutionException e) {
+            assertTrue(validateException(e));
+        }
     }
 
     @Test
-    public void testUnAuthorizedCallWithInvalidMethod() throws PrimerException {
-        assertFalse(PrimerAuthorizationRegistry.authorize("simple/auth/test", "test", "POST", token, webToken));
+    public void testUnAuthorizedCallWithInvalidMethod() throws PrimerException, ExecutionException {
+        try {
+        PrimerAuthorizationRegistry.authorize("simple/auth/test", "POST", token);
+        fail("Should have failed!!");
+    } catch (UncheckedExecutionException e) {
+        assertTrue(validateException(e));
+    }
+
+}
+
+    @Test
+    public void testUnAuthorizedCallWithInvalidPath() throws PrimerException, ExecutionException {
+        try {
+            PrimerAuthorizationRegistry.authorize("simple/auth/test/invalid", "GET", token);
+            fail("Should have failed!!");
+        } catch (UncheckedExecutionException e) {
+            assertTrue(validateException(e));
+        }
     }
 
     @Test
-    public void testUnAuthorizedCallWithInvalidPath() throws PrimerException {
-        assertFalse(PrimerAuthorizationRegistry.authorize("simple/auth/test/invalid", "test", "GET", token, webToken));
+    public void testUnAuthorizedCallWithInvalidRoleAndMethod() throws PrimerException, ExecutionException {
+        try {
+            PrimerAuthorizationRegistry.authorize("simple/auth/test", "POST", token);
+            fail("Should have failed!!");
+        } catch (UncheckedExecutionException e) {
+            assertTrue(validateException(e));
+        }
     }
 
-    @Test
-    public void testUnAuthorizedCallWithInvalidRoleAndMethod() throws PrimerException {
-        assertFalse(PrimerAuthorizationRegistry.authorize("simple/auth/test", "invalid", "POST", token, webToken));
+    private boolean validateException(Throwable e) {
+        boolean exception = e.getCause() instanceof PrimerException;
+        if(e.getCause() instanceof PrimerException) {
+            exception = true;
+        } else if(e.getCause() instanceof CompletionException) {
+            if(e.getCause().getCause() instanceof PrimerException) {
+                exception = true;
+            }
+        }
+        return exception;
     }
 }

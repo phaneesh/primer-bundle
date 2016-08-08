@@ -32,7 +32,6 @@ import io.dropwizard.ConfiguredBundle;
 import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.primer.auth.PrimerAuthenticatorRequestFilter;
 import io.dropwizard.primer.auth.PrimerAuthorizationRegistry;
-import io.dropwizard.primer.cache.TokenCacheManager;
 import io.dropwizard.primer.client.PrimerClient;
 import io.dropwizard.primer.core.PrimerError;
 import io.dropwizard.primer.exception.PrimerException;
@@ -100,22 +99,14 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
     @Override
     public void run(T configuration, Environment environment) throws Exception {
         final val primerConfig = getPrimerConfiguration(configuration);
-        initializeAuthorization(configuration);
+        final JsonWebTokenParser tokenParser = new DefaultJsonWebTokenParser();
+        final byte[] secretKey = getPrimerConfiguration(configuration).getPrivateKey().getBytes(StandardCharsets.UTF_8);
+        final HmacSHA512Verifier tokenVerifier = new HmacSHA512Verifier(secretKey);
+        initializeAuthorization(configuration, tokenParser, tokenVerifier);
         final JacksonDecoder decoder = new JacksonDecoder();
         final JacksonEncoder encoder = new JacksonEncoder();
         final Slf4jLogger logger = new Slf4jLogger();
 
-        environment.lifecycle().manage(new Managed() {
-            @Override
-            public void start() throws Exception {
-                TokenCacheManager.init(primerConfig);
-            }
-
-            @Override
-            public void stop() throws Exception {
-
-            }
-        });
         environment.lifecycle().manage(new Managed() {
             @Override
             public void start() throws Exception {
@@ -149,13 +140,8 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
             }
         });
         environment.jersey().register(new PrimerExceptionMapper());
-        final JsonWebTokenParser tokenParser = new DefaultJsonWebTokenParser();
-        final byte[] secretKey = getPrimerConfiguration(configuration).getPrivateKey().getBytes(StandardCharsets.UTF_8);
-        final HmacSHA512Verifier tokenVerifier = new HmacSHA512Verifier(secretKey);
         environment.jersey().register(PrimerAuthenticatorRequestFilter.builder()
                 .configuration(getPrimerConfiguration(configuration))
-                .tokenParser(tokenParser)
-                .verifier(tokenVerifier)
                 .objectMapper(environment.getObjectMapper())
                 .build());
     }
@@ -181,7 +167,7 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
         }
     }
 
-    private void initializeAuthorization(T configuration) {
+    private void initializeAuthorization(T configuration, JsonWebTokenParser tokenParser, HmacSHA512Verifier tokenVerifier) {
         final val primerConfig = getPrimerConfiguration(configuration);
         final Set<String> whiteListUrls = new HashSet<>();
         final Set<String> dynamicWhiteList = withWhiteList(configuration);
@@ -197,6 +183,6 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
         } else {
             permissionMatrix.getAuthorizations().addAll(withAuthorization(configuration).getAuthorizations());
         }
-        PrimerAuthorizationRegistry.init(permissionMatrix, whiteListUrls);
+        PrimerAuthorizationRegistry.init(permissionMatrix, whiteListUrls, primerConfig, tokenParser, tokenVerifier);
     }
 }
