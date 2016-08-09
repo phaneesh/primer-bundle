@@ -73,15 +73,15 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
     @Override
     @Metered(name = "primer")
     public void filter(ContainerRequestContext requestContext) throws IOException {
-        if(!configuration.isEnabled()) {
+        if (!configuration.isEnabled()) {
             return;
         }
         //Short circuit for all white listed urls
-        if(PrimerAuthorizationRegistry.isWhilisted(requestContext.getUriInfo().getPath())) {
+        if (PrimerAuthorizationRegistry.isWhilisted(requestContext.getUriInfo().getPath())) {
             return;
         }
         Optional<String> token = getToken(requestContext);
-        if(!token.isPresent()) {
+        if (!token.isPresent()) {
             requestContext.abortWith(
                     Response.status(Response.Status.BAD_REQUEST)
                             .entity(objectMapper.writeValueAsBytes(PrimerError.builder().errorCode("PR000").message("Bad request")
@@ -93,8 +93,8 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                 //Stamp authorization headers for downstream services which can
                 // use this to stop token forgery & misuse
                 stampHeaders(requestContext, webToken);
-            } catch(UncheckedExecutionException e) {
-                if(e.getCause() instanceof CompletionException) {
+            } catch (UncheckedExecutionException e) {
+                if (e.getCause() instanceof CompletionException) {
                     handleException(e.getCause().getCause(), requestContext, token.get());
                 } else {
                     handleException(e.getCause(), requestContext, token.get());
@@ -115,7 +115,7 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
         log.debug("Authorization Header: {}", header);
         if (header != null) {
             final String rawToken = header.replaceAll(configuration.getPrefix(), "").trim();
-            if(Strings.isNullOrEmpty(rawToken)) {
+            if (Strings.isNullOrEmpty(rawToken)) {
                 return Optional.empty();
             }
             return Optional.of(rawToken);
@@ -125,12 +125,12 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
 
 
     private void stampHeaders(ContainerRequestContext requestContext, JsonWebToken webToken) {
-        final String tokenType = (String)webToken.claim().getParameter("type");
-        switch(tokenType) {
+        final String tokenType = (String) webToken.claim().getParameter("type");
+        switch (tokenType) {
             case "dynamic":
-                requestContext.getHeaders().putSingle(AUTHORIZED_FOR_ID, (String)webToken.claim().getParameter("user_id"));
+                requestContext.getHeaders().putSingle(AUTHORIZED_FOR_ID, (String) webToken.claim().getParameter("user_id"));
                 requestContext.getHeaders().putSingle(AUTHORIZED_FOR_SUBJECT, webToken.claim().subject());
-                requestContext.getHeaders().putSingle(AUTHORIZED_FOR_NAME, (String)webToken.claim().getParameter("name"));
+                requestContext.getHeaders().putSingle(AUTHORIZED_FOR_NAME, (String) webToken.claim().getParameter("name"));
                 break;
             case "static":
                 requestContext.getHeaders().putSingle(AUTHORIZED_FOR_SUBJECT, webToken.claim().subject());
@@ -141,43 +141,45 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
     }
 
     private void handleException(Throwable e, ContainerRequestContext requestContext, String token) throws JsonProcessingException {
-        if(e.getCause() instanceof TokenExpiredException || e instanceof TokenExpiredException) {
+        if (e.getCause() instanceof TokenExpiredException || e instanceof TokenExpiredException) {
             log.error("Token Expiry Error: {}", e.getMessage());
             requestContext.abortWith(
                     Response.status(Response.Status.PRECONDITION_FAILED)
                             .entity(objectMapper.writeValueAsBytes(PrimerError.builder().errorCode("PR003").message("Expired")
                                     .build())).build()
             );
-        }
-        else if(e.getCause() instanceof MalformedJsonWebTokenException || e instanceof MalformedJsonWebTokenException) {
+        } else if (e.getCause() instanceof MalformedJsonWebTokenException || e instanceof MalformedJsonWebTokenException) {
             log.error("Token Malformed Error: {}", e.getMessage());
             requestContext.abortWith(
                     Response.status(Response.Status.UNAUTHORIZED)
                             .entity(objectMapper.writeValueAsBytes(PrimerError.builder().errorCode("PR004").message("Unauthorized")
                                     .build())).build()
             );
-        }
-        else if(e.getCause() instanceof InvalidSignatureException || e instanceof InvalidSignatureException) {
+        } else if (e.getCause() instanceof InvalidSignatureException || e instanceof InvalidSignatureException) {
             log.error("Token Signature Error: {}", e.getMessage());
             requestContext.abortWith(
                     Response.status(Response.Status.UNAUTHORIZED)
                             .entity(objectMapper.writeValueAsBytes(PrimerError.builder().errorCode("PR004").message("Unauthorized")
                                     .build())).build()
             );
-        }
-        else if(e.getCause() instanceof FeignException || e instanceof FeignException) {
+        } else if (e.getCause() instanceof FeignException) {
             log.error("Feign error: {}", e.getMessage());
-            handleError(Response.Status.fromStatusCode(((FeignException)e.getCause()).status()), "PR000", e.getCause().getMessage(), token,
+            handleError(Response.Status.fromStatusCode(((FeignException) e.getCause()).status()), "PR000", e.getCause().getMessage(), token,
                     requestContext);
 
-        }
-        else if(e.getCause() instanceof PrimerException || e instanceof PrimerException) {
-            log.error("Primer error: {}", e.getMessage());
-            handleError(Response.Status.fromStatusCode(((PrimerException)e.getCause()).getStatus()), ((PrimerException)e.getCause()).getErrorCode(),
-                    e.getCause().getMessage(), token,
+        } else if (e instanceof FeignException) {
+            log.error("Feign error: {}", e.getMessage());
+            handleError(Response.Status.fromStatusCode(((FeignException) e).status()), "PR000", e.getMessage(), token,
                     requestContext);
-        }
-        else {
+        } else if (e.getCause() instanceof PrimerException) {
+            log.error("Primer error: {}", e.getMessage());
+            handleError(Response.Status.fromStatusCode(((PrimerException) e.getCause()).getStatus()), ((PrimerException) e.getCause()).getErrorCode(),
+                    e.getCause().getMessage(), token, requestContext);
+        } else if (e instanceof PrimerException) {
+            log.error("Primer error: {}", e.getMessage());
+            handleError(Response.Status.fromStatusCode(((PrimerException) e).getStatus()), ((PrimerException) e).getErrorCode(),
+                    e.getMessage(), token, requestContext);
+        } else {
             log.error("General error: {}", e);
             handleError(Response.Status.INTERNAL_SERVER_ERROR, "PR000", "Error", token, requestContext);
         }
@@ -185,7 +187,7 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
 
     private void handleError(Response.Status status, String errorCode, String message, String token,
                              ContainerRequestContext requestContext) throws JsonProcessingException {
-        switch(status) {
+        switch (status) {
             case NOT_FOUND:
             case UNAUTHORIZED:
                 PrimerAuthorizationRegistry.blacklist(token);
