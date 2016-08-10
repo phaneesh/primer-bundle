@@ -16,13 +16,13 @@
 
 package io.dropwizard.primer.auth;
 
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.guava.CaffeinatedGuava;
 import com.github.toastshaman.dropwizard.auth.jwt.JsonWebTokenParser;
 import com.github.toastshaman.dropwizard.auth.jwt.hmac.HmacSHA512Verifier;
 import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
 import com.github.toastshaman.dropwizard.auth.jwt.validator.ExpiryValidator;
 import com.google.common.base.Strings;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import io.dropwizard.primer.PrimerBundle;
 import io.dropwizard.primer.core.ServiceUser;
@@ -95,14 +95,24 @@ public class PrimerAuthorizationRegistry {
         whiteListUrls.forEach(url -> whiteList.add(generatePathExpression(url)));
         Collections.sort(whiteList, (o1, o2) -> tokenMatch.matcher(o2).groupCount() - tokenMatch.matcher(o1).groupCount());
         Collections.sort(whiteList, (o1, o2) -> o2.compareTo(o1));
-        blacklistCache = CaffeinatedGuava.build(
-                Caffeine.newBuilder()
+        blacklistCache = CacheBuilder.newBuilder()
                         .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
-                        .maximumSize(configuration.getCacheMaxSize()), s -> Optional.of(false));
-        lruCache = CaffeinatedGuava.build(
-                Caffeine.newBuilder()
+                        .maximumSize(configuration.getCacheMaxSize())
+                        .build(new CacheLoader<String, Optional<Boolean>>() {
+                            @Override
+                            public Optional<Boolean> load(String key) throws Exception {
+                                return Optional.of(false);
+                            }
+                        });
+        lruCache = CacheBuilder.newBuilder()
                         .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
-                        .maximumSize(configuration.getCacheMaxSize()), PrimerAuthorizationRegistry::verifyToken);
+                        .maximumSize(configuration.getCacheMaxSize())
+                .build(new CacheLoader<TokenKey, JsonWebToken>() {
+                    @Override
+                    public JsonWebToken load(TokenKey key) throws Exception {
+                        return verifyToken(key);
+                    }
+                });
         expiryValidator = new ExpiryValidator(new Duration(configuration.getClockSkew()));
     }
 

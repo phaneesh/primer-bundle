@@ -69,7 +69,7 @@ public class PerimerAuthorizationsTest extends BaseTest {
         try {
             PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", token);
             fail("Should have failed!!");
-        } catch (UncheckedExecutionException e) {
+        } catch (ExecutionException e) {
             assertTrue(validateException(e));
         }
     }
@@ -79,7 +79,7 @@ public class PerimerAuthorizationsTest extends BaseTest {
         try {
         PrimerAuthorizationRegistry.authorize("simple/auth/test", "POST", token);
         fail("Should have failed!!");
-    } catch (UncheckedExecutionException e) {
+    } catch (ExecutionException e) {
         assertTrue(validateException(e));
     }
 
@@ -90,7 +90,7 @@ public class PerimerAuthorizationsTest extends BaseTest {
         try {
             PrimerAuthorizationRegistry.authorize("simple/auth/test/invalid", "GET", token);
             fail("Should have failed!!");
-        } catch (UncheckedExecutionException e) {
+        } catch (ExecutionException e) {
             assertTrue(validateException(e));
         }
     }
@@ -100,13 +100,13 @@ public class PerimerAuthorizationsTest extends BaseTest {
         try {
             PrimerAuthorizationRegistry.authorize("simple/auth/test", "POST", token);
             fail("Should have failed!!");
-        } catch (UncheckedExecutionException e) {
+        } catch (ExecutionException e) {
             assertTrue(validateException(e));
         }
     }
 
     private boolean validateException(Throwable e) {
-        boolean exception = e.getCause() instanceof PrimerException;
+        boolean exception = e instanceof PrimerException;
         if(e.getCause() instanceof PrimerException) {
             exception = true;
         } else if(e.getCause() instanceof CompletionException) {

@@ -93,6 +93,12 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                 //Stamp authorization headers for downstream services which can
                 // use this to stop token forgery & misuse
                 stampHeaders(requestContext, webToken);
+            } catch(ExecutionException e) {
+                if (e.getCause() instanceof PrimerException) {
+                    handleException(e.getCause(), requestContext, token.get());
+                } else {
+                    handleException(e, requestContext, token.get());
+                }
             } catch (UncheckedExecutionException e) {
                 if (e.getCause() instanceof CompletionException) {
                     handleException(e.getCause().getCause(), requestContext, token.get());
