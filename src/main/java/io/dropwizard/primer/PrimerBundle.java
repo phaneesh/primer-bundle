@@ -180,13 +180,26 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
             whiteListUrls.addAll(primerConfig.getWhileListUrl());
         }
         PrimerAuthorizationMatrix permissionMatrix = primerConfig.getAuthorizations();
+        //If no authorizations are provided in config then just get authorizations programmatically
         if(permissionMatrix == null) {
             permissionMatrix = withAuthorization(configuration);
-        } else {
+        } else { //Else needs to merge both the authorizations
+            val dynamicAuthMatrix = withAuthorization(configuration);
             if(permissionMatrix.getAuthorizations() == null) {
-                permissionMatrix.setAuthorizations(new ArrayList<>());
+                permissionMatrix.setAuthorizations(dynamicAuthMatrix.getAuthorizations());
+            } else {
+                permissionMatrix.getAuthorizations().addAll(dynamicAuthMatrix.getAuthorizations());
             }
-            permissionMatrix.getAuthorizations().addAll(withAuthorization(configuration).getAuthorizations());
+            if(permissionMatrix.getAutoAuthorizations() == null) {
+                permissionMatrix.setAutoAuthorizations(dynamicAuthMatrix.getAutoAuthorizations());
+            } else {
+                permissionMatrix.getAutoAuthorizations().addAll(dynamicAuthMatrix.getAutoAuthorizations());
+            }
+            if(permissionMatrix.getStaticAuthorizations() == null) {
+                permissionMatrix.setStaticAuthorizations(dynamicAuthMatrix.getStaticAuthorizations());
+            } else {
+                permissionMatrix.getStaticAuthorizations().addAll(dynamicAuthMatrix.getStaticAuthorizations());
+            }
         }
         PrimerAuthorizationRegistry.init(permissionMatrix, whiteListUrls, primerConfig, tokenParser, tokenVerifier);
     }
