@@ -50,6 +50,7 @@ import org.apache.curator.retry.RetryNTimes;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -182,6 +183,9 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
         if(permissionMatrix == null) {
             permissionMatrix = withAuthorization(configuration);
         } else {
+            if(permissionMatrix.getAuthorizations() == null) {
+                permissionMatrix.setAuthorizations(new ArrayList<>());
+            }
             permissionMatrix.getAuthorizations().addAll(withAuthorization(configuration).getAuthorizations());
         }
         PrimerAuthorizationRegistry.init(permissionMatrix, whiteListUrls, primerConfig, tokenParser, tokenVerifier);
