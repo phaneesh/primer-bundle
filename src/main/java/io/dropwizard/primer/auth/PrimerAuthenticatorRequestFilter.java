@@ -179,7 +179,8 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                     requestContext);
         } else if (e.getCause() instanceof PrimerException) {
             PrimerException primerException = (PrimerException) e.getCause();
-            log.error("Primer error: {} status: {} errorCode: {} message: {} headers: {}", e.getMessage(),
+            log.error("Primer error: {}", e.getMessage());
+            log.debug("Primer error: {} status: {} errorCode: {} message: {} headers: {}", e.getMessage(),
                     primerException.getStatus(),
                     primerException.getErrorCode(),
                     primerException.getMessage(),
@@ -188,7 +189,8 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                     e.getCause().getMessage(), token, requestContext);
         } else if (e instanceof PrimerException) {
             PrimerException primerException = (PrimerException) e;
-            log.error("Primer error: {} status: {} errorCode: {} message: {} headers: {}", e.getMessage(),
+            log.error("Primer error: {}", e.getMessage());
+            log.debug("Primer error: {} status: {} errorCode: {} message: {} headers: {}", e.getMessage(),
                     primerException.getStatus(),
                     primerException.getErrorCode(),
                     primerException.getMessage(),
