@@ -93,7 +93,7 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                 //Stamp authorization headers for downstream services which can
                 // use this to stop token forgery & misuse
                 stampHeaders(requestContext, webToken);
-            } catch(ExecutionException e) {
+            } catch (ExecutionException e) {
                 if (e.getCause() instanceof PrimerException) {
                     handleException(e.getCause(), requestContext, token.get());
                 } else {
@@ -178,11 +178,23 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
             handleError(Response.Status.fromStatusCode(((FeignException) e).status()), "PR000", e.getMessage(), token,
                     requestContext);
         } else if (e.getCause() instanceof PrimerException) {
+            PrimerException primerException = (PrimerException) e.getCause();
             log.error("Primer error: {}", e.getMessage());
+            log.debug("Primer error: {} status: {} errorCode: {} message: {} headers: {}", e.getMessage(),
+                    primerException.getStatus(),
+                    primerException.getErrorCode(),
+                    primerException.getMessage(),
+                    requestContext.getHeaders());
             handleError(Response.Status.fromStatusCode(((PrimerException) e.getCause()).getStatus()), ((PrimerException) e.getCause()).getErrorCode(),
                     e.getCause().getMessage(), token, requestContext);
         } else if (e instanceof PrimerException) {
+            PrimerException primerException = (PrimerException) e;
             log.error("Primer error: {}", e.getMessage());
+            log.debug("Primer error: {} status: {} errorCode: {} message: {} headers: {}", e.getMessage(),
+                    primerException.getStatus(),
+                    primerException.getErrorCode(),
+                    primerException.getMessage(),
+                    requestContext.getHeaders());
             handleError(Response.Status.fromStatusCode(((PrimerException) e).getStatus()), ((PrimerException) e).getErrorCode(),
                     e.getMessage(), token, requestContext);
         } else {
