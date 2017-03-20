@@ -231,7 +231,7 @@ public class PrimerAuthorizationRegistry {
                 final String type = (String) webToken.claim().getParameter("type");
                 return verify(webToken, tokenKey.getToken(), type);
             default:
-                log.info("Invalid type for index: {} for token: {}",
+                log.debug("Invalid type for index: {} for token: {}",
                             authList.get(index.get()).getType(), tokenKey);
                 throw PrimerException.builder()
                         .errorCode("PR004")
