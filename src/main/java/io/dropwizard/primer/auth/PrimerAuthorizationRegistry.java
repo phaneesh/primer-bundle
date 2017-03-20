@@ -150,7 +150,7 @@ public class PrimerAuthorizationRegistry {
             case "static":
                 return verifyStatic(webToken, token);
         }
-        log.error("Invalid token type {} for token {}", type, token);
+        log.debug("Invalid token type {} for token {}", type, token);
         throw PrimerException.builder()
                 .errorCode("PR004")
                 .message("Unauthorized")
@@ -171,7 +171,7 @@ public class PrimerAuthorizationRegistry {
         );
         val result = (!Strings.isNullOrEmpty(verifyResponse.getToken()) && !Strings.isNullOrEmpty(verifyResponse.getUserId()));
         if (!result) {
-            log.error("Dynamic token validation failed for {} with {}", token, verifyResponse);
+            log.debug("Dynamic token validation failed for {} with {}", token, verifyResponse);
             blacklist(token);
             throw PrimerException.builder()
                     .errorCode("PR004")
@@ -187,7 +187,7 @@ public class PrimerAuthorizationRegistry {
                 webToken.claim().subject(), token, (String) webToken.claim().getParameter("role"));
         val result = (!Strings.isNullOrEmpty(verifyStaticResponse.getToken()) && !Strings.isNullOrEmpty(verifyStaticResponse.getId()));
         if (!result) {
-            log.error("Static token validation failed for {} response: {}", token, verifyStaticResponse);
+            log.debug("Static token validation failed for {} response: {}", token, verifyStaticResponse);
             blacklist(token);
             throw PrimerException.builder()
                     .errorCode("PR004")
@@ -205,7 +205,7 @@ public class PrimerAuthorizationRegistry {
         final String role = (String) webToken.claim().getParameter("role");
         val index = urlPatterns.stream().filter(tokenKey.getPath()::matches).findFirst();
         if (!index.isPresent()) {
-            log.error("No index found for {}", tokenKey);
+            log.debug("No index found for {}", tokenKey);
             throw PrimerException.builder()
                     .errorCode("PR004")
                     .message("Unauthorized")
@@ -214,7 +214,7 @@ public class PrimerAuthorizationRegistry {
         }
         //Short circuit for method auth failure
         if (!isAuthorized(index.get(), tokenKey.getMethod(), role)) {
-            log.error("Role, method combo check failed for Method={} Role={} Index={}",
+            log.debug("Role, method combo check failed for Method={} Role={} Index={}",
                     index.get(), role, tokenKey.getMethod());
             throw PrimerException.builder()
                     .errorCode("PR004")
