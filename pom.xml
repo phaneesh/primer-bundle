@@ -4,7 +4,7 @@
 
     <groupId>io.dropwizard</groupId>
     <artifactId>dropwizard-primer</artifactId>
-    <version>1.0.5-2</version>
+    <version>1.0.5-3-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>dropwizard-primer</name>
