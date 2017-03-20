@@ -150,7 +150,7 @@ public class PrimerAuthorizationRegistry {
             case "static":
                 return verifyStatic(webToken, token);
         }
-        log.error("Invalid token type {}", type);
+        log.error("Invalid token type {} for token {}", type, token);
         throw PrimerException.builder()
                 .errorCode("PR004")
                 .message("Unauthorized")
