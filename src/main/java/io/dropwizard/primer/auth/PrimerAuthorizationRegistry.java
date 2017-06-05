@@ -204,19 +204,24 @@ public class PrimerAuthorizationRegistry {
         expiryValidator.validate(webToken);
         final String role = (String) webToken.claim().getParameter("role");
         val index = urlPatterns.stream().filter(tokenKey.getPath()::matches).findFirst();
-        if (!index.isPresent())
+        if (!index.isPresent()) {
+            log.debug("No index found for {}", tokenKey);
             throw PrimerException.builder()
                     .errorCode("PR004")
                     .message("Unauthorized")
                     .status(401)
                     .build();
+        }
         //Short circuit for method auth failure
-        if (!isAuthorized(index.get(), tokenKey.getMethod(), role))
+        if (!isAuthorized(index.get(), tokenKey.getMethod(), role)) {
+            log.debug("Role, method combo check failed for Method={} Role={} Index={}",
+                    index.get(), role, tokenKey.getMethod());
             throw PrimerException.builder()
                     .errorCode("PR004")
                     .message("Unauthorized")
                     .status(401)
                     .build();
+        }
         switch (authList.get(index.get()).getType()) {
             case "dynamic":
                 return verify(webToken, tokenKey.getToken(), "dynamic");
