@@ -63,6 +63,7 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
     private static final String AUTHORIZED_FOR_ID = "X-AUTHORIZED-FOR-ID";
     private static final String AUTHORIZED_FOR_SUBJECT = "X-AUTHORIZED-FOR-SUBJECT";
     private static final String AUTHORIZED_FOR_NAME = "X-AUTHORIZED-FOR-NAME";
+    private static final String AUTHORIZED_FOR_ROLE = "X-AUTHORIZED-FOR-ROLE";
 
     @Builder
     public PrimerAuthenticatorRequestFilter(final PrimerBundleConfiguration configuration, final ObjectMapper objectMapper) {
@@ -137,9 +138,11 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                 requestContext.getHeaders().putSingle(AUTHORIZED_FOR_ID, (String) webToken.claim().getParameter("user_id"));
                 requestContext.getHeaders().putSingle(AUTHORIZED_FOR_SUBJECT, webToken.claim().subject());
                 requestContext.getHeaders().putSingle(AUTHORIZED_FOR_NAME, (String) webToken.claim().getParameter("name"));
+                requestContext.getHeaders().putSingle(AUTHORIZED_FOR_ROLE, (String) webToken.claim().getParameter("role"));
                 break;
             case "static":
                 requestContext.getHeaders().putSingle(AUTHORIZED_FOR_SUBJECT, webToken.claim().subject());
+                requestContext.getHeaders().putSingle(AUTHORIZED_FOR_ROLE, (String) webToken.claim().getParameter("role"));
                 break;
             default:
                 log.warn("No auth header stamped for type: {}", tokenType);
