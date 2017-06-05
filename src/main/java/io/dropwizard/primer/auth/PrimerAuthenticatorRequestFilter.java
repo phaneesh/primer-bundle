@@ -198,7 +198,7 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
             handleError(Response.Status.fromStatusCode(((PrimerException) e).getStatus()), ((PrimerException) e).getErrorCode(),
                     e.getMessage(), token, requestContext);
         } else {
-            log.error("General error: {}", e);
+            log.error("General error: ", e);
             handleError(Response.Status.INTERNAL_SERVER_ERROR, "PR000", "Error", token, requestContext);
         }
     }
