@@ -150,7 +150,7 @@ public class PrimerAuthorizationRegistry {
             case "static":
                 return verifyStatic(webToken, token);
         }
-        log.debug("Invalid token type {} for token {}", type, token);
+        log.debug("invalid_token_type type:{} token:{}", type, token);
         throw PrimerException.builder()
                 .errorCode("PR004")
                 .message("Unauthorized")
@@ -171,7 +171,7 @@ public class PrimerAuthorizationRegistry {
         );
         val result = (!Strings.isNullOrEmpty(verifyResponse.getToken()) && !Strings.isNullOrEmpty(verifyResponse.getUserId()));
         if (!result) {
-            log.debug("Dynamic token validation failed for {} with {}", token, verifyResponse);
+            log.debug("dynamic_token_validation_failed token:{} verify_response:{}", token, verifyResponse);
             blacklist(token);
             throw PrimerException.builder()
                     .errorCode("PR004")
@@ -187,7 +187,7 @@ public class PrimerAuthorizationRegistry {
                 webToken.claim().subject(), token, (String) webToken.claim().getParameter("role"));
         val result = (!Strings.isNullOrEmpty(verifyStaticResponse.getToken()) && !Strings.isNullOrEmpty(verifyStaticResponse.getId()));
         if (!result) {
-            log.debug("Static token validation failed for {} response: {}", token, verifyStaticResponse);
+            log.debug("dynamic_token_validation_failed token:{} verify_response:{}", token, verifyStaticResponse);
             blacklist(token);
             throw PrimerException.builder()
                     .errorCode("PR004")
@@ -231,8 +231,8 @@ public class PrimerAuthorizationRegistry {
                 final String type = (String) webToken.claim().getParameter("type");
                 return verify(webToken, tokenKey.getToken(), type);
             default:
-                log.debug("Invalid type for index: {} for token: {}",
-                            authList.get(index.get()).getType(), tokenKey);
+                log.debug("invalid_token_type for index:{} token:{}",
+                        authList.get(index.get()).getType(), tokenKey);
                 throw PrimerException.builder()
                         .errorCode("PR004")
                         .message("Unauthorized")
