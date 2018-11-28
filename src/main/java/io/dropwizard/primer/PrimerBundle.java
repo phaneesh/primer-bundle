@@ -39,6 +39,7 @@ import io.dropwizard.primer.model.PrimerAuthorizationMatrix;
 import io.dropwizard.primer.model.PrimerBundleConfiguration;
 import io.dropwizard.primer.model.PrimerRangerEndpoint;
 import io.dropwizard.primer.model.PrimerSimpleEndpoint;
+import io.dropwizard.server.DefaultServerFactory;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import lombok.extern.slf4j.Slf4j;
@@ -110,10 +111,10 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
         final JacksonDecoder decoder = new JacksonDecoder();
         final JacksonEncoder encoder = new JacksonEncoder();
         final Slf4jLogger logger = new Slf4jLogger();
-
+        final int clientConnectionPool = configuration.getServerFactory() instanceof DefaultServerFactory ?
+                ((DefaultServerFactory)configuration.getServerFactory()).getMaxThreads() : 128;
         environment.lifecycle().manage(new Managed() {
             final Dispatcher dispatcher = new Dispatcher();
-
             final OkHttpClient.Builder builder = new OkHttpClient.Builder()
                     .retryOnConnectionFailure(true)
                     .connectTimeout(Integer.MAX_VALUE, TimeUnit.MILLISECONDS)
@@ -123,13 +124,13 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
                     .followRedirects(false)
                     .followSslRedirects(false)
                     .connectionPool(new ConnectionPool(
-                            2048, 3000, TimeUnit.MILLISECONDS
+                            clientConnectionPool, 3000, TimeUnit.MILLISECONDS
                     ));
 
             @Override
-            public void start() throws Exception {
-                dispatcher.setMaxRequests(2048);
-                dispatcher.setMaxRequestsPerHost(2048);
+            public void start() {
+                dispatcher.setMaxRequests(clientConnectionPool);
+                dispatcher.setMaxRequestsPerHost(clientConnectionPool);
                 builder.dispatcher(dispatcher);
                 primerClient = Feign.builder()
                         .decoder(decoder)
@@ -156,7 +157,7 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
             }
 
             @Override
-            public void stop() throws Exception {
+            public void stop() {
 
             }
         });
