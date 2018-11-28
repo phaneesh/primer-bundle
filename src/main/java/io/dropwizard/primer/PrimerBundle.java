@@ -24,7 +24,6 @@ import feign.Logger;
 import feign.Target;
 import feign.jackson.JacksonDecoder;
 import feign.jackson.JacksonEncoder;
-import feign.okhttp.OkHttpClient;
 import feign.ranger.RangerTarget;
 import feign.slf4j.Slf4jLogger;
 import io.dropwizard.Configuration;
@@ -44,15 +43,18 @@ import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
+import okhttp3.ConnectionPool;
+import okhttp3.Dispatcher;
+import okhttp3.OkHttpClient;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.retry.RetryNTimes;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author phaneesh
@@ -110,8 +112,25 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
         final Slf4jLogger logger = new Slf4jLogger();
 
         environment.lifecycle().manage(new Managed() {
+            final Dispatcher dispatcher = new Dispatcher();
+
+            final OkHttpClient.Builder builder = new OkHttpClient.Builder()
+                    .retryOnConnectionFailure(true)
+                    .connectTimeout(Integer.MAX_VALUE, TimeUnit.MILLISECONDS)
+                    .readTimeout(Integer.MAX_VALUE, TimeUnit.MILLISECONDS)
+                    .writeTimeout(Integer.MAX_VALUE, TimeUnit.MILLISECONDS)
+                    .connectTimeout(Integer.MAX_VALUE, TimeUnit.MILLISECONDS)
+                    .followRedirects(false)
+                    .followSslRedirects(false)
+                    .connectionPool(new ConnectionPool(
+                            2048, 3000, TimeUnit.MILLISECONDS
+                    ));
+
             @Override
             public void start() throws Exception {
+                dispatcher.setMaxRequests(2048);
+                dispatcher.setMaxRequestsPerHost(2048);
+                builder.dispatcher(dispatcher);
                 primerClient = Feign.builder()
                         .decoder(decoder)
                         .encoder(encoder)
@@ -130,7 +149,7 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
                                         .message(e.getMessage()).build();
                             }
                         })
-                        .client(new OkHttpClient())
+                        .client(new feign.okhttp.OkHttpClient(builder.build()))
                         .logger(logger)
                         .logLevel(Logger.Level.BASIC)
                         .target(getPrimerTarget(configuration, environment));
