@@ -18,7 +18,6 @@ package io.dropwizard.primer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
-import com.google.common.util.concurrent.UncheckedExecutionException;
 import io.dropwizard.primer.auth.PrimerAuthorizationRegistry;
 import io.dropwizard.primer.core.VerifyResponse;
 import io.dropwizard.primer.exception.PrimerException;
@@ -69,7 +68,7 @@ public class PerimerAuthorizationsTest extends BaseTest {
         try {
             PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", token);
             fail("Should have failed!!");
-        } catch (ExecutionException e) {
+        } catch (Exception e) {
             assertTrue(validateException(e));
         }
     }
@@ -79,7 +78,7 @@ public class PerimerAuthorizationsTest extends BaseTest {
         try {
         PrimerAuthorizationRegistry.authorize("simple/auth/test", "POST", token);
         fail("Should have failed!!");
-    } catch (ExecutionException e) {
+    } catch (Exception e) {
         assertTrue(validateException(e));
     }
 
@@ -90,7 +89,7 @@ public class PerimerAuthorizationsTest extends BaseTest {
         try {
             PrimerAuthorizationRegistry.authorize("simple/auth/test/invalid", "GET", token);
             fail("Should have failed!!");
-        } catch (ExecutionException e) {
+        } catch (Exception e) {
             assertTrue(validateException(e));
         }
     }
@@ -100,7 +99,7 @@ public class PerimerAuthorizationsTest extends BaseTest {
         try {
             PrimerAuthorizationRegistry.authorize("simple/auth/test", "POST", token);
             fail("Should have failed!!");
-        } catch (ExecutionException e) {
+        } catch (Exception e) {
             assertTrue(validateException(e));
         }
     }
