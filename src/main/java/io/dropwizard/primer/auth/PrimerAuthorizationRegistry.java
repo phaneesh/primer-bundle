@@ -16,14 +16,13 @@
 
 package io.dropwizard.primer.auth;
 
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.github.toastshaman.dropwizard.auth.jwt.JsonWebTokenParser;
 import com.github.toastshaman.dropwizard.auth.jwt.hmac.HmacSHA512Verifier;
 import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
 import com.github.toastshaman.dropwizard.auth.jwt.validator.ExpiryValidator;
 import com.google.common.base.Strings;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
 import io.dropwizard.primer.PrimerBundle;
 import io.dropwizard.primer.core.ServiceUser;
 import io.dropwizard.primer.core.VerifyResponse;
@@ -37,7 +36,6 @@ import lombok.val;
 import org.joda.time.Duration;
 
 import java.util.*;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
@@ -94,31 +92,21 @@ public class PrimerAuthorizationRegistry {
                     urlToAuthMap.put(pattern, auth);
                 });
             }
-            Collections.sort(urlPatterns, (o1, o2) -> tokenMatch.matcher(o2).groupCount() - tokenMatch.matcher(o1).groupCount());
-            Collections.sort(urlPatterns, (o1, o2) -> o2.compareTo(o1));
+            urlPatterns.sort((o1, o2) -> tokenMatch.matcher(o2).groupCount() - tokenMatch.matcher(o1).groupCount());
+            urlPatterns.sort(Comparator.reverseOrder());
             urlPatterns.forEach(pattern -> authList.put(pattern, urlToAuthMap.get(pattern)));
         }
         whiteListUrls.forEach(url -> whiteList.add(generatePathExpression(url)));
-        Collections.sort(whiteList, (o1, o2) -> tokenMatch.matcher(o2).groupCount() - tokenMatch.matcher(o1).groupCount());
-        Collections.sort(whiteList, (o1, o2) -> o2.compareTo(o1));
-        blacklistCache = CacheBuilder.newBuilder()
+        whiteList.sort((o1, o2) -> tokenMatch.matcher(o2).groupCount() - tokenMatch.matcher(o1).groupCount());
+        whiteList.sort(Comparator.reverseOrder());
+        blacklistCache = Caffeine.newBuilder()
                         .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
                         .maximumSize(configuration.getCacheMaxSize())
-                        .build(new CacheLoader<String, Optional<Boolean>>() {
-                            @Override
-                            public Optional<Boolean> load(String key) throws Exception {
-                                return Optional.of(false);
-                            }
-                        });
-        lruCache = CacheBuilder.newBuilder()
+                        .build(key -> Optional.of(false));
+        lruCache = Caffeine.newBuilder()
                         .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
                         .maximumSize(configuration.getCacheMaxSize())
-                .build(new CacheLoader<TokenKey, JsonWebToken>() {
-                    @Override
-                    public JsonWebToken load(TokenKey key) throws Exception {
-                        return verifyToken(key);
-                    }
-                });
+                .build(PrimerAuthorizationRegistry::verifyToken);
         expiryValidator = new ExpiryValidator(new Duration(configuration.getClockSkew()));
     }
 
@@ -126,7 +114,7 @@ public class PrimerAuthorizationRegistry {
         return path.replaceAll("\\{(([^/])+\\})", "(([^/])+)");
     }
 
-    public static JsonWebToken authorize(final String path, final String method, final String token) throws ExecutionException {
+    public static JsonWebToken authorize(final String path, final String method, final String token) {
         return lruCache.get(TokenKey.builder()
                 .method(method)
                 .path(path)
@@ -136,7 +124,7 @@ public class PrimerAuthorizationRegistry {
 
     public static boolean isWhilisted(final String path) {
         return whiteList.stream()
-                .filter(path::matches).findFirst().isPresent();
+                .anyMatch(path::matches);
     }
 
     private static boolean isAuthorized(final String id, final String method, final String role) {
