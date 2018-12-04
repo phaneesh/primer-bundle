@@ -20,9 +20,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
 import feign.Feign;
 import feign.Logger;
+import feign.httpclient.ApacheHttpClient;
 import feign.jackson.JacksonDecoder;
 import feign.jackson.JacksonEncoder;
-import feign.okhttp.OkHttpClient;
 import feign.slf4j.Slf4jLogger;
 import io.dropwizard.primer.client.PrimerClient;
 import io.dropwizard.primer.core.PrimerError;
@@ -59,7 +59,7 @@ public class PrimerBundleTests extends BaseTest {
     public void testWhitelistedUrl() {
         val result = resources.client().target("/simple/noauth/test").request()
                 .get(Response.class);
-        assertTrue(result.getStatus() == 200);
+        assertEquals(200, result.getStatus());
     }
 
     @Test
@@ -94,7 +94,7 @@ public class PrimerBundleTests extends BaseTest {
                                 .message(e.getMessage()).build();
                     }
                 })
-                .client(new OkHttpClient())
+                .client(new ApacheHttpClient())
                 .logger(logger)
                 .logLevel(Logger.Level.BASIC)
                 .target(PrimerClient.class, "http://localhost:9090");

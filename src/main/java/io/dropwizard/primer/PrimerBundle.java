@@ -22,6 +22,7 @@ import com.github.toastshaman.dropwizard.auth.jwt.parser.DefaultJsonWebTokenPars
 import feign.Feign;
 import feign.Logger;
 import feign.Target;
+import feign.httpclient.ApacheHttpClient;
 import feign.jackson.JacksonDecoder;
 import feign.jackson.JacksonEncoder;
 import feign.ranger.RangerTarget;
@@ -44,18 +45,24 @@ import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
-import okhttp3.ConnectionPool;
-import okhttp3.Dispatcher;
-import okhttp3.OkHttpClient;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.retry.RetryNTimes;
+import org.apache.http.Consts;
+import org.apache.http.HttpRequestInterceptor;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.config.ConnectionConfig;
+import org.apache.http.config.SocketConfig;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.apache.http.protocol.HTTP;
 
 import java.io.IOException;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
 /**
  * @author phaneesh
@@ -101,7 +108,7 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
     }
 
     @Override
-    public void run(T configuration, Environment environment) throws Exception {
+    public void run(T configuration, Environment environment) {
         final val primerConfig = getPrimerConfiguration(configuration);
         final JsonWebTokenParser tokenParser = new DefaultJsonWebTokenParser();
         final byte[] secretKey = primerConfig.getPrivateKey().getBytes(StandardCharsets.UTF_8);
@@ -114,24 +121,45 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
         final int clientConnectionPool = configuration.getServerFactory() instanceof DefaultServerFactory ?
                 ((DefaultServerFactory)configuration.getServerFactory()).getMaxThreads() : 128;
         environment.lifecycle().manage(new Managed() {
-            final Dispatcher dispatcher = new Dispatcher();
-            final OkHttpClient.Builder builder = new OkHttpClient.Builder()
-                    .retryOnConnectionFailure(true)
-                    .connectTimeout(Integer.MAX_VALUE, TimeUnit.MILLISECONDS)
-                    .readTimeout(Integer.MAX_VALUE, TimeUnit.MILLISECONDS)
-                    .writeTimeout(Integer.MAX_VALUE, TimeUnit.MILLISECONDS)
-                    .connectTimeout(Integer.MAX_VALUE, TimeUnit.MILLISECONDS)
-                    .followRedirects(false)
-                    .followSslRedirects(false)
-                    .connectionPool(new ConnectionPool(
-                            clientConnectionPool, 3000, TimeUnit.MILLISECONDS
-                    ));
 
             @Override
             public void start() {
-                dispatcher.setMaxRequests(clientConnectionPool);
-                dispatcher.setMaxRequestsPerHost(clientConnectionPool);
-                builder.dispatcher(dispatcher);
+
+                // Create socket configuration
+                SocketConfig socketConfig = SocketConfig.custom()
+                        .setTcpNoDelay(true)
+                        .setSoKeepAlive(true)
+                        .build();
+
+                // Create connection configuration
+                ConnectionConfig connectionConfig = ConnectionConfig.custom()
+                        .setMalformedInputAction(CodingErrorAction.IGNORE)
+                        .setUnmappableInputAction(CodingErrorAction.IGNORE)
+                        .setCharset(Consts.UTF_8)
+                        .build();
+
+                PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
+                connectionManager.setDefaultMaxPerRoute(clientConnectionPool);
+                connectionManager.setMaxTotal(clientConnectionPool);
+                connectionManager.setDefaultMaxPerRoute(clientConnectionPool);
+                connectionManager.setValidateAfterInactivity(30000);
+                connectionManager.setDefaultSocketConfig(socketConfig);
+                connectionManager.setDefaultConnectionConfig(connectionConfig);
+
+                // Create global request configuration
+                RequestConfig defaultRequestConfig = RequestConfig.custom()
+                        .setAuthenticationEnabled(false)
+                        .setRedirectsEnabled(false)
+                        .setConnectTimeout(Integer.MAX_VALUE)
+                        .setConnectionRequestTimeout(Integer.MAX_VALUE)
+                        .build();
+
+
+                final HttpClientBuilder client = HttpClients.custom()
+                        .addInterceptorFirst((HttpRequestInterceptor) (httpRequest, httpContext) -> httpRequest.removeHeaders(HTTP.CONTENT_LEN))
+                        .setConnectionManager(connectionManager)
+                        .setDefaultRequestConfig(defaultRequestConfig);
+
                 primerClient = Feign.builder()
                         .decoder(decoder)
                         .encoder(encoder)
@@ -150,7 +178,7 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
                                         .message(e.getMessage()).build();
                             }
                         })
-                        .client(new feign.okhttp.OkHttpClient(builder.build()))
+                        .client(new ApacheHttpClient(client.build()))
                         .logger(logger)
                         .logLevel(Logger.Level.BASIC)
                         .target(getPrimerTarget(configuration, environment));
