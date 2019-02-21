@@ -17,10 +17,15 @@
 package io.dropwizard.primer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
+import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebTokenClaim;
+import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebTokenHeader;
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
+import io.dropwizard.primer.auth.AuthType;
 import io.dropwizard.primer.auth.PrimerAuthorizationRegistry;
 import io.dropwizard.primer.core.VerifyResponse;
 import io.dropwizard.primer.exception.PrimerException;
+import org.joda.time.DateTime;
 import org.junit.Rule;
 import org.junit.Test;
 
@@ -34,7 +39,7 @@ import static org.junit.Assert.*;
 /**
  * @author phaneesh
  */
-public class PerimerAuthorizationsTest extends BaseTest {
+public class PrimerAuthorizationsTest extends BaseTest {
 
     @Rule
     public WireMockRule wireMockRule = new WireMockRule(9999);
@@ -60,13 +65,37 @@ public class PerimerAuthorizationsTest extends BaseTest {
                                     .token(token)
                                     .userId("test")
                                     .build()))));
-        assertNotNull(PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", token));
+        assertNotNull(PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", token, AuthType.CONFIG));
     }
 
     @Test
-    public void testUnAuthorizedCallWithInvalidRole() throws PrimerException, ExecutionException {
+    public void testAnnotatedAuthorizedCall() throws JsonProcessingException {
+        stubFor(post(urlEqualTo("/v1/verify/test/test"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(mapper.writeValueAsBytes(VerifyResponse.builder()
+                                .expiresAt(Instant.now().plusSeconds(10000).toEpochMilli())
+                                .token(token)
+                                .userId("test")
+                                .build()))));
+        assertNotNull(PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", token, AuthType.ANNOTATION));
+    }
+
+    @Test
+    public void testUnAuthorizedCallWithInvalidRole() {
         try {
-            PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", token);
+            PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", buildTokenWithInvalidRole(), AuthType.CONFIG);
+            fail("Should have failed!!");
+        } catch (Exception e) {
+            assertTrue(validateException(e));
+        }
+    }
+
+    @Test
+    public void testAnnotatedUnAuthorizedCall() throws PrimerException, ExecutionException {
+        try {
+            PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", token, AuthType.ANNOTATION);
             fail("Should have failed!!");
         } catch (Exception e) {
             assertTrue(validateException(e));
@@ -76,7 +105,7 @@ public class PerimerAuthorizationsTest extends BaseTest {
     @Test
     public void testUnAuthorizedCallWithInvalidMethod() throws PrimerException, ExecutionException {
         try {
-        PrimerAuthorizationRegistry.authorize("simple/auth/test", "POST", token);
+        PrimerAuthorizationRegistry.authorize("simple/auth/test", "POST", token, AuthType.CONFIG);
         fail("Should have failed!!");
     } catch (Exception e) {
         assertTrue(validateException(e));
@@ -87,7 +116,7 @@ public class PerimerAuthorizationsTest extends BaseTest {
     @Test
     public void testUnAuthorizedCallWithInvalidPath() throws PrimerException, ExecutionException {
         try {
-            PrimerAuthorizationRegistry.authorize("simple/auth/test/invalid", "GET", token);
+            PrimerAuthorizationRegistry.authorize("simple/auth/test/invalid", "GET", token, AuthType.CONFIG);
             fail("Should have failed!!");
         } catch (Exception e) {
             assertTrue(validateException(e));
@@ -95,13 +124,33 @@ public class PerimerAuthorizationsTest extends BaseTest {
     }
 
     @Test
-    public void testUnAuthorizedCallWithInvalidRoleAndMethod() throws PrimerException, ExecutionException {
+    public void testUnAuthorizedCallWithInvalidRoleAndMethod() {
         try {
-            PrimerAuthorizationRegistry.authorize("simple/auth/test", "POST", token);
+            PrimerAuthorizationRegistry.authorize("simple/auth/test", "POST", buildTokenWithInvalidRole(), AuthType.CONFIG);
             fail("Should have failed!!");
         } catch (Exception e) {
             assertTrue(validateException(e));
         }
+    }
+
+    private String buildTokenWithInvalidRole() {
+        JsonWebToken jwt = JsonWebToken.builder()
+                .header(
+                        JsonWebTokenHeader.HS512()
+                )
+                .claim(JsonWebTokenClaim
+                        .builder()
+                        .expiration(DateTime.now().plusYears(1))
+                        .subject("test")
+                        .issuer("test")
+                        .issuedAt(DateTime.now())
+                        .param("user_id", "test")
+                        .param("role", "test_invalid")
+                        .param("name", "test")
+                        .param("type", "dynamic")
+                        .build())
+                .build();
+        return hmacSHA512Signer.sign(jwt);
     }
 
     private boolean validateException(Throwable e) {

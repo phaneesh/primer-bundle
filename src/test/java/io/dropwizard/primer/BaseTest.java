@@ -27,6 +27,8 @@ import io.dropwizard.jersey.DropwizardResourceConfig;
 import io.dropwizard.jersey.setup.JerseyEnvironment;
 import io.dropwizard.jetty.MutableServletContextHandler;
 import io.dropwizard.lifecycle.setup.LifecycleEnvironment;
+import io.dropwizard.primer.auth.authorizer.PrimerAnnotationAuthorizer;
+import io.dropwizard.primer.auth.authorizer.PrimerRoleAuthorizer;
 import io.dropwizard.primer.model.PrimerAuthorization;
 import io.dropwizard.primer.model.PrimerAuthorizationMatrix;
 import io.dropwizard.primer.model.PrimerBundleConfiguration;
@@ -44,7 +46,7 @@ import static org.mockito.Mockito.when;
 /**
  * @author phaneesh
  */
-public class BaseTest {
+public abstract class BaseTest {
 
     protected final HealthCheckRegistry healthChecks = mock(HealthCheckRegistry.class);
     protected final JerseyEnvironment jerseyEnvironment = mock(JerseyEnvironment.class);
@@ -78,6 +80,11 @@ public class BaseTest {
                             .url("simple/auth/test")
                     .build()).build();
         }
+
+        @Override
+        public PrimerAnnotationAuthorizer authorizer() {
+            return PrimerRoleAuthorizer.builder().build();
+        }
     };
 
     protected PrimerBundleConfiguration primerBundleConfiguration;
@@ -97,6 +104,7 @@ public class BaseTest {
                     .param("user_id", "test")
                     .param("role", "test")
                     .param("name", "test")
+                    .param("type", "dynamic")
                     .build())
             .build();
 

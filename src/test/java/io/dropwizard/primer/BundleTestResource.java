@@ -16,6 +16,8 @@
 
 package io.dropwizard.primer;
 
+import io.dropwizard.primer.auth.annotation.PrimerAuth;
+
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.core.Response;
@@ -35,6 +37,13 @@ public class BundleTestResource {
     @GET
     @Path("/simple/auth/test")
     public Response testAuth() {
+        return Response.status(Response.Status.OK).build();
+    }
+
+    @GET
+    @PrimerAuth(value = {"test", "test1"})
+    @Path("/annotation/auth")
+    public Response testAnnotationAuth() {
         return Response.status(Response.Status.OK).build();
     }
 

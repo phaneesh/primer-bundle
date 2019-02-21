@@ -31,8 +31,8 @@ import io.dropwizard.primer.exception.PrimerException;
 import io.dropwizard.primer.model.PrimerAuthorization;
 import io.dropwizard.primer.model.PrimerAuthorizationMatrix;
 import io.dropwizard.primer.model.PrimerBundleConfiguration;
+import lombok.*;
 import lombok.extern.slf4j.Slf4j;
-import lombok.val;
 import org.joda.time.Duration;
 
 import java.util.*;
@@ -68,33 +68,31 @@ public class PrimerAuthorizationRegistry {
         urlPatterns = new ArrayList<>();
         parser = tokenParser;
         verifier = tokenVerifier;
-        val urlToAuthMap = new HashMap<String, PrimerAuthorization>();
         val tokenMatch = Pattern.compile("\\{(([^/])+\\})");
         if (matrix != null) {
             if(matrix.getAuthorizations() != null) {
                 matrix.getAuthorizations().forEach(auth -> {
                     final String pattern = generatePathExpression(auth.getUrl());
                     urlPatterns.add(pattern);
-                    urlToAuthMap.put(pattern, auth);
+                    authList.put(pattern, auth);
                 });
             }
             if(matrix.getStaticAuthorizations() != null) {
                 matrix.getStaticAuthorizations().forEach(auth -> {
                     final String pattern = generatePathExpression(auth.getUrl());
                     urlPatterns.add(pattern);
-                    urlToAuthMap.put(pattern, auth);
+                    authList.put(pattern, auth);
                 });
             }
             if(matrix.getAutoAuthorizations() != null) {
                 matrix.getAutoAuthorizations().forEach(auth -> {
                     final String pattern = generatePathExpression(auth.getUrl());
                     urlPatterns.add(pattern);
-                    urlToAuthMap.put(pattern, auth);
+                    authList.put(pattern, auth);
                 });
             }
             urlPatterns.sort((o1, o2) -> tokenMatch.matcher(o2).groupCount() - tokenMatch.matcher(o1).groupCount());
             urlPatterns.sort(Comparator.reverseOrder());
-            urlPatterns.forEach(pattern -> authList.put(pattern, urlToAuthMap.get(pattern)));
         }
         whiteListUrls.forEach(url -> whiteList.add(generatePathExpression(url)));
         whiteList.sort((o1, o2) -> tokenMatch.matcher(o2).groupCount() - tokenMatch.matcher(o1).groupCount());
@@ -114,11 +112,12 @@ public class PrimerAuthorizationRegistry {
         return path.replaceAll("\\{(([^/])+\\})", "(([^/])+)");
     }
 
-    public static JsonWebToken authorize(final String path, final String method, final String token) {
+    public static JsonWebToken authorize(final String path, final String method, final String token, final AuthType authType) {
         return lruCache.get(TokenKey.builder()
                 .method(method)
                 .path(path)
                 .token(token)
+                .authType(authType)
                 .build());
     }
 
@@ -134,7 +133,7 @@ public class PrimerAuthorizationRegistry {
     private static JsonWebToken verify(JsonWebToken webToken, String token, String type) throws PrimerException {
         switch (type) {
             case "dynamic":
-                return verify(webToken, token);
+                return verifyDynamic(webToken, token);
             case "static":
                 return verifyStatic(webToken, token);
         }
@@ -146,7 +145,7 @@ public class PrimerAuthorizationRegistry {
                 .build();
     }
 
-    private static JsonWebToken verify(JsonWebToken webToken, String token) throws PrimerException {
+    private static JsonWebToken verifyDynamic(JsonWebToken webToken, String token) throws PrimerException {
         final VerifyResponse verifyResponse = PrimerBundle.getPrimerClient().verify(
                 webToken.claim().issuer(),
                 webToken.claim().subject(),
@@ -186,7 +185,7 @@ public class PrimerAuthorizationRegistry {
         return webToken;
     }
 
-    private static JsonWebToken verifyToken(TokenKey tokenKey) throws PrimerException {
+    private static JsonWebToken verifyConfigAuthToken(TokenKey tokenKey) throws PrimerException {
         final JsonWebToken webToken = parser.parse(tokenKey.getToken());
         verifier.verifySignature(webToken);
         expiryValidator.validate(webToken);
@@ -229,8 +228,49 @@ public class PrimerAuthorizationRegistry {
         }
     }
 
+    private static JsonWebToken verifyAnnotationAuthToken(TokenKey tokenKey) throws PrimerException {
+        final JsonWebToken webToken = parser.parse(tokenKey.getToken());
+        verifier.verifySignature(webToken);
+        expiryValidator.validate(webToken);
+
+        final String type = (String) webToken.claim().getParameter("type");
+        return verify(webToken, tokenKey.getToken(), type);
+    }
+
+    private static JsonWebToken verifyToken(TokenKey tokenKey) throws PrimerException {
+        switch (tokenKey.getAuthType()) {
+            case CONFIG:
+                return verifyConfigAuthToken(tokenKey);
+            case ANNOTATION:
+                return verifyAnnotationAuthToken(tokenKey);
+            default:
+                throw PrimerException.builder()
+                        .errorCode("PR004")
+                        .message("Unauthorized")
+                        .status(401)
+                        .build();
+        }
+    }
+
     static void blacklist(String token) {
         blacklistCache.put(token, Optional.of(true));
+    }
+
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    @EqualsAndHashCode(exclude = {"path", "method", "authType"})
+    @ToString
+    @Builder
+    private static class TokenKey {
+
+        private String token;
+
+        private String path;
+
+        private String method;
+
+        private AuthType authType;
     }
 
 }
