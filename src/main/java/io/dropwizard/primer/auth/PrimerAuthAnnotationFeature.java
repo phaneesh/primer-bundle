@@ -36,6 +36,8 @@ public class PrimerAuthAnnotationFeature implements DynamicFeature {
                     .ifPresent(primerAuth ->
                             featureContext.register(
                                     PrimerAuthAnnotationFilter.builder()
+                                            .configuration(configuration)
+                                            .objectMapper(mapper)
                                             .primerAuth(primerAuth)
                                             .authorizer(authorizer)
                                             .build()
