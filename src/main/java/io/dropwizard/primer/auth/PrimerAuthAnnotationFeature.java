@@ -1,9 +1,9 @@
 package io.dropwizard.primer.auth;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.dropwizard.primer.auth.filter.PrimerAuthAnnotationFilter;
-import io.dropwizard.primer.auth.authorizer.PrimerAnnotationAuthorizer;
 import io.dropwizard.primer.auth.annotation.PrimerAuth;
+import io.dropwizard.primer.auth.authorizer.PrimerAnnotationAuthorizer;
+import io.dropwizard.primer.auth.filter.PrimerAuthAnnotationFilter;
 import io.dropwizard.primer.model.PrimerBundleConfiguration;
 import lombok.Builder;
 
@@ -11,7 +11,6 @@ import javax.ws.rs.container.DynamicFeature;
 import javax.ws.rs.container.ResourceInfo;
 import javax.ws.rs.core.FeatureContext;
 import java.lang.reflect.Method;
-import java.util.Arrays;
 import java.util.stream.Stream;
 
 public class PrimerAuthAnnotationFeature implements DynamicFeature {
@@ -30,8 +29,7 @@ public class PrimerAuthAnnotationFeature implements DynamicFeature {
     public void configure(ResourceInfo resourceInfo, FeatureContext featureContext) {
         final Method resourceMethod = resourceInfo.getResourceMethod();
         if (resourceMethod != null) {
-            Stream.of(resourceMethod.getParameterAnnotations())
-                    .flatMap(Arrays::stream)
+            Stream.of(resourceMethod.getDeclaredAnnotations())
                     .filter(annotation -> annotation.annotationType().equals(PrimerAuth.class))
                     .map(PrimerAuth.class::cast)
                     .findFirst()
