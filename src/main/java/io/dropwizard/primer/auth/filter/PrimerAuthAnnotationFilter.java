@@ -15,7 +15,6 @@ import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.annotation.Priority;
-import javax.inject.Singleton;
 import javax.ws.rs.Priorities;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.Response;
@@ -31,7 +30,6 @@ import java.util.concurrent.ExecutionException;
 @Slf4j
 @Provider
 @Priority(Priorities.AUTHENTICATION)
-@Singleton
 public class PrimerAuthAnnotationFilter extends AuthFilter {
 
     private final PrimerAnnotationAuthorizer authorizer;
