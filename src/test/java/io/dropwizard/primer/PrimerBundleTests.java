@@ -40,7 +40,8 @@ import java.io.IOException;
 import java.time.Instant;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.fail;
 
 /**
  * @author phaneesh
@@ -113,5 +114,22 @@ public class PrimerBundleTests extends BaseTest {
         } catch (PrimerException e) {
             fail();
         }
+    }
+
+    @Test
+    public void testPrimerAuthAnnotation() throws JsonProcessingException {
+        stubFor(post(urlEqualTo("/v1/verify/test/test"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(mapper.writeValueAsBytes(VerifyResponse.builder()
+                                .expiresAt(Instant.now().plusSeconds(10000).toEpochMilli())
+                                .token(token)
+                                .userId("test")
+                                .build()))));
+
+        val result = resources.client().target("/annotation/auth").request()
+                .get(Response.class);
+        assertEquals(200, result.getStatus());
     }
 }

@@ -1,22 +1,5 @@
-/*
- * Copyright 2016 Phaneesh Nagaraja <phaneesh.n@gmail.com>.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package io.dropwizard.primer.auth;
 
-import com.codahale.metrics.annotation.Metered;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.toastshaman.dropwizard.auth.jwt.exceptions.InvalidSignatureException;
@@ -24,100 +7,45 @@ import com.github.toastshaman.dropwizard.auth.jwt.exceptions.MalformedJsonWebTok
 import com.github.toastshaman.dropwizard.auth.jwt.exceptions.TokenExpiredException;
 import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
 import com.google.common.base.Strings;
-import com.google.common.util.concurrent.UncheckedExecutionException;
 import feign.FeignException;
 import io.dropwizard.primer.core.PrimerError;
 import io.dropwizard.primer.exception.PrimerException;
 import io.dropwizard.primer.model.PrimerBundleConfiguration;
-import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 
-import javax.annotation.Priority;
-import javax.inject.Singleton;
-import javax.ws.rs.Priorities;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
-import javax.ws.rs.ext.Provider;
-import java.io.IOException;
 import java.util.Optional;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 
-
 /**
- * @author phaneesh
+ * Created by pavan.kumar on 2019-02-19
  */
 @Slf4j
-@Provider
-@Priority(Priorities.AUTHENTICATION)
-@Singleton
-public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter {
+public abstract class AuthFilter implements ContainerRequestFilter {
 
-
-    private PrimerBundleConfiguration configuration;
-
-    private ObjectMapper objectMapper;
+    protected final AuthType authType;
+    protected final PrimerBundleConfiguration configuration;
+    protected final ObjectMapper objectMapper;
 
     private static final String AUTHORIZED_FOR_ID = "X-AUTHORIZED-FOR-ID";
     private static final String AUTHORIZED_FOR_SUBJECT = "X-AUTHORIZED-FOR-SUBJECT";
     private static final String AUTHORIZED_FOR_NAME = "X-AUTHORIZED-FOR-NAME";
     private static final String AUTHORIZED_FOR_ROLE = "X-AUTHORIZED-FOR-ROLE";
 
-    @Builder
-    public PrimerAuthenticatorRequestFilter(final PrimerBundleConfiguration configuration, final ObjectMapper objectMapper) {
+    protected AuthFilter(AuthType authType, PrimerBundleConfiguration configuration, ObjectMapper objectMapper) {
+        this.authType = authType;
         this.configuration = configuration;
         this.objectMapper = objectMapper;
     }
 
-    @Override
-    @Metered(name = "primer")
-    public void filter(ContainerRequestContext requestContext) throws IOException {
-        if (!configuration.isEnabled()) {
-            return;
-        }
-        //Short circuit for all white listed urls
-        if (PrimerAuthorizationRegistry.isWhilisted(requestContext.getUriInfo().getPath())) {
-            return;
-        }
-        Optional<String> token = getToken(requestContext);
-        if (!token.isPresent()) {
-            requestContext.abortWith(
-                    Response.status(Response.Status.BAD_REQUEST)
-                            .entity(objectMapper.writeValueAsBytes(PrimerError.builder().errorCode("PR000").message("Bad request")
-                                    .build())).build()
-            );
-        } else {
-            try {
-                JsonWebToken webToken = authorize(requestContext, token.get());
-                //Stamp authorization headers for downstream services which can
-                // use this to stop token forgery & misuse
-                stampHeaders(requestContext, webToken);
-            } catch (ExecutionException e) {
-                if (e.getCause() instanceof PrimerException) {
-                    handleException(e.getCause(), requestContext, token.get());
-                } else {
-                    handleException(e, requestContext, token.get());
-                }
-            } catch (UncheckedExecutionException e) {
-                if (e.getCause() instanceof CompletionException) {
-                    handleException(e.getCause().getCause(), requestContext, token.get());
-                } else {
-                    handleException(e.getCause(), requestContext, token.get());
-                }
-            } catch (Exception e) {
-                log.error("Execution error: {}", e.getMessage());
-                handleError(Response.Status.INTERNAL_SERVER_ERROR, "PR000", "Error", token.get(), requestContext);
-            }
-        }
+    protected JsonWebToken authorize(ContainerRequestContext requestContext, String token, AuthType authType) throws ExecutionException {
+        return PrimerAuthorizationRegistry.authorize(requestContext.getUriInfo().getPath(), requestContext.getMethod(), token, authType);
     }
 
-    private JsonWebToken authorize(ContainerRequestContext requestContext, String token) throws ExecutionException {
-        return PrimerAuthorizationRegistry.authorize(requestContext.getUriInfo().getPath(), requestContext.getMethod(), token);
-    }
-
-    private Optional<String> getToken(ContainerRequestContext requestContext) {
+    protected Optional<String> getToken(ContainerRequestContext requestContext) {
         final String header = requestContext.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
         log.debug("Authorization Header: {}", header);
         if (header != null) {
@@ -131,7 +59,7 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
     }
 
 
-    private void stampHeaders(ContainerRequestContext requestContext, JsonWebToken webToken) {
+    protected void stampHeaders(ContainerRequestContext requestContext, JsonWebToken webToken) {
         final String tokenType = (String) webToken.claim().getParameter("type");
         switch (tokenType) {
             case "dynamic":
@@ -149,7 +77,7 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
         }
     }
 
-    private void handleException(Throwable e, ContainerRequestContext requestContext, String token) throws JsonProcessingException {
+    protected void handleException(Throwable e, ContainerRequestContext requestContext, String token) throws JsonProcessingException {
         if (e.getCause() instanceof TokenExpiredException || e instanceof TokenExpiredException) {
             log.error("Token Expiry Error: {}", e.getMessage());
             requestContext.abortWith(
@@ -206,7 +134,7 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
         }
     }
 
-    private void handleError(Response.Status status, String errorCode, String message, String token,
+    protected void handleError(Response.Status status, String errorCode, String message, String token,
                              ContainerRequestContext requestContext) throws JsonProcessingException {
         switch (status) {
             case NOT_FOUND:
@@ -232,4 +160,5 @@ public class PrimerAuthenticatorRequestFilter implements ContainerRequestFilter 
                                 .build());
         }
     }
+
 }

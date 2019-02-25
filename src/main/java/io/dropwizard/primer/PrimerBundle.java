@@ -30,8 +30,10 @@ import feign.slf4j.Slf4jLogger;
 import io.dropwizard.Configuration;
 import io.dropwizard.ConfiguredBundle;
 import io.dropwizard.lifecycle.Managed;
-import io.dropwizard.primer.auth.PrimerAuthenticatorRequestFilter;
+import io.dropwizard.primer.auth.PrimerAuthAnnotationFeature;
 import io.dropwizard.primer.auth.PrimerAuthorizationRegistry;
+import io.dropwizard.primer.auth.authorizer.PrimerAnnotationAuthorizer;
+import io.dropwizard.primer.auth.filter.PrimerAuthConfigFilter;
 import io.dropwizard.primer.client.PrimerClient;
 import io.dropwizard.primer.core.PrimerError;
 import io.dropwizard.primer.exception.PrimerException;
@@ -79,6 +81,8 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
     public abstract Set<String> withWhiteList(T configuration);
 
     public abstract PrimerAuthorizationMatrix withAuthorization(T configuration);
+
+    public abstract PrimerAnnotationAuthorizer authorizer();
 
     public static PrimerClient getPrimerClient() {
         return primerClient;
@@ -190,9 +194,15 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
             }
         });
         environment.jersey().register(new PrimerExceptionMapper());
-        environment.jersey().register(PrimerAuthenticatorRequestFilter.builder()
+        environment.jersey().register(PrimerAuthConfigFilter.builder()
                 .configuration(getPrimerConfiguration(configuration))
                 .objectMapper(environment.getObjectMapper())
+                .build());
+
+        environment.jersey().register(PrimerAuthAnnotationFeature.builder()
+                .authorizer(authorizer())
+                .configuration(primerConfig)
+                .mapper(environment.getObjectMapper())
                 .build());
     }
 
