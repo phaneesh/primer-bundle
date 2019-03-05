@@ -33,12 +33,12 @@ public class PrimerAuthAnnotationFeature implements DynamicFeature {
                     .filter(annotation -> annotation.annotationType().equals(Authorize.class))
                     .map(Authorize.class::cast)
                     .findFirst()
-                    .ifPresent(primerAuth ->
+                    .ifPresent(authorize ->
                             featureContext.register(
                                     PrimerAuthAnnotationFilter.builder()
                                             .configuration(configuration)
                                             .objectMapper(mapper)
-                                            .primerAuth(primerAuth)
+                                            .authorize(authorize)
                                             .authorizer(authorizer)
                                             .build()
                             )
