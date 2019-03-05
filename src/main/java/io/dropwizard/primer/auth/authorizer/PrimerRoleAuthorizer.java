@@ -1,7 +1,7 @@
 package io.dropwizard.primer.auth.authorizer;
 
 import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
-import io.dropwizard.primer.auth.annotation.PrimerAuth;
+import io.dropwizard.primer.auth.annotation.Authorize;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 
@@ -18,9 +18,9 @@ import java.util.List;
 public class PrimerRoleAuthorizer implements PrimerAnnotationAuthorizer {
 
     @Override
-    public boolean authorize(JsonWebToken jwt, ContainerRequestContext containerRequestContext, PrimerAuth primerAuth) {
+    public boolean authorize(JsonWebToken jwt, ContainerRequestContext containerRequestContext, Authorize authorize) {
 
-        List<String> authorizedRoles = Arrays.asList(primerAuth.value());
+        List<String> authorizedRoles = Arrays.asList(authorize.value());
 
         if (authorizedRoles.contains(jwt.claim().getParameter("role")))
             return true;

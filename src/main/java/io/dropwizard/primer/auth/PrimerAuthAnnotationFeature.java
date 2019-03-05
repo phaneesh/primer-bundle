@@ -1,7 +1,7 @@
 package io.dropwizard.primer.auth;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.dropwizard.primer.auth.annotation.PrimerAuth;
+import io.dropwizard.primer.auth.annotation.Authorize;
 import io.dropwizard.primer.auth.authorizer.PrimerAnnotationAuthorizer;
 import io.dropwizard.primer.auth.filter.PrimerAuthAnnotationFilter;
 import io.dropwizard.primer.model.PrimerBundleConfiguration;
@@ -30,15 +30,15 @@ public class PrimerAuthAnnotationFeature implements DynamicFeature {
         final Method resourceMethod = resourceInfo.getResourceMethod();
         if (resourceMethod != null) {
             Stream.of(resourceMethod.getDeclaredAnnotations())
-                    .filter(annotation -> annotation.annotationType().equals(PrimerAuth.class))
-                    .map(PrimerAuth.class::cast)
+                    .filter(annotation -> annotation.annotationType().equals(Authorize.class))
+                    .map(Authorize.class::cast)
                     .findFirst()
-                    .ifPresent(primerAuth ->
+                    .ifPresent(authorize ->
                             featureContext.register(
                                     PrimerAuthAnnotationFilter.builder()
                                             .configuration(configuration)
                                             .objectMapper(mapper)
-                                            .primerAuth(primerAuth)
+                                            .authorize(authorize)
                                             .authorizer(authorizer)
                                             .build()
                             )
