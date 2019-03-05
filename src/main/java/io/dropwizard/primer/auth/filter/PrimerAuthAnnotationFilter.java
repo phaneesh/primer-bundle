@@ -6,7 +6,7 @@ import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import io.dropwizard.primer.auth.AuthFilter;
 import io.dropwizard.primer.auth.AuthType;
-import io.dropwizard.primer.auth.annotation.PrimerAuth;
+import io.dropwizard.primer.auth.annotation.Authorize;
 import io.dropwizard.primer.auth.authorizer.PrimerAnnotationAuthorizer;
 import io.dropwizard.primer.core.PrimerError;
 import io.dropwizard.primer.exception.PrimerException;
@@ -33,18 +33,18 @@ import java.util.concurrent.ExecutionException;
 public class PrimerAuthAnnotationFilter extends AuthFilter {
 
     private final PrimerAnnotationAuthorizer authorizer;
-    private final PrimerAuth primerAuth;
+    private final Authorize authorize;
 
     @Builder
     public PrimerAuthAnnotationFilter(PrimerBundleConfiguration configuration, ObjectMapper objectMapper,
-                                      PrimerAuth primerAuth, PrimerAnnotationAuthorizer authorizer) {
+                                      Authorize authorize, PrimerAnnotationAuthorizer authorizer) {
         super(AuthType.ANNOTATION, configuration, objectMapper);
         this.authorizer = authorizer;
-        this.primerAuth = primerAuth;
+        this.authorize = authorize;
     }
 
     @Override
-    @Metered(name = "primerAuth")
+    @Metered(name = "authorize")
     public void filter(ContainerRequestContext requestContext) throws IOException {
         if (!configuration.isEnabled() || !configuration.getAuthTypesEnabled().getOrDefault(AuthType.ANNOTATION, false)) {
             return;
@@ -62,7 +62,7 @@ public class PrimerAuthAnnotationFilter extends AuthFilter {
                 JsonWebToken webToken = authorize(requestContext, token.get(), this.authType);
 
                 // Execute authorizer
-                if (authorizer != null && !authorizer.authorize(webToken, requestContext, primerAuth)) {
+                if (authorizer != null && !authorizer.authorize(webToken, requestContext, authorize)) {
                     handleException(
                             PrimerException.builder()
                                     .errorCode("PR004")

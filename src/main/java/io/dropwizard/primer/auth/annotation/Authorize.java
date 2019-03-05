@@ -9,10 +9,10 @@ import static java.lang.annotation.ElementType.TYPE;
 
 @Retention(RetentionPolicy.RUNTIME)
 @Target({TYPE, METHOD})
-public @interface PrimerAuth {
+public @interface Authorize {
 
     String[] value() default {};
 
-    PrimerAuthParam[] authParams() default {};
+    AuthParam[] authParams() default {};
 
 }
