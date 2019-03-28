@@ -63,15 +63,8 @@ public class PrimerAuthAnnotationFilter extends AuthFilter {
 
                 // Execute authorizer
                 if (authorizer != null && !authorizer.authorize(webToken, requestContext, authorize)) {
-                    handleException(
-                            PrimerException.builder()
-                                    .errorCode("PR004")
-                                    .message("Unauthorized")
-                                    .status(401)
-                                    .build(),
-                            requestContext,
-                            token.get()
-                    );
+                    // Abort request without blacklisting the token. FIXME: This should be controlled by the authorizer.
+                    abortRequest(requestContext, Response.Status.FORBIDDEN, PrimerError.builder().errorCode("PR002").message("Forbidden").build());
                     return;
                 }
 
