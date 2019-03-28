@@ -80,24 +80,24 @@ public abstract class AuthFilter implements ContainerRequestFilter {
     protected void handleException(Throwable e, ContainerRequestContext requestContext, String token) throws JsonProcessingException {
         if (e.getCause() instanceof TokenExpiredException || e instanceof TokenExpiredException) {
             log.error("Token Expiry Error: {}", e.getMessage());
-            requestContext.abortWith(
-                    Response.status(Response.Status.PRECONDITION_FAILED)
-                            .entity(objectMapper.writeValueAsBytes(PrimerError.builder().errorCode("PR003").message("Expired")
-                                    .build())).build()
+            abortRequest(
+                    requestContext,
+                    Response.Status.PRECONDITION_FAILED,
+                    PrimerError.builder().errorCode("PR003").message("Expired").build()
             );
         } else if (e.getCause() instanceof MalformedJsonWebTokenException || e instanceof MalformedJsonWebTokenException) {
             log.error("Token Malformed Error: {}", e.getMessage());
-            requestContext.abortWith(
-                    Response.status(Response.Status.UNAUTHORIZED)
-                            .entity(objectMapper.writeValueAsBytes(PrimerError.builder().errorCode("PR004").message("Unauthorized")
-                                    .build())).build()
+            abortRequest(
+                    requestContext,
+                    Response.Status.UNAUTHORIZED,
+                    PrimerError.builder().errorCode("PR004").message("Unauthorized").build()
             );
         } else if (e.getCause() instanceof InvalidSignatureException || e instanceof InvalidSignatureException) {
             log.error("Token Signature Error: {}", e.getMessage());
-            requestContext.abortWith(
-                    Response.status(Response.Status.UNAUTHORIZED)
-                            .entity(objectMapper.writeValueAsBytes(PrimerError.builder().errorCode("PR004").message("Unauthorized")
-                                    .build())).build()
+            abortRequest(
+                    requestContext,
+                    Response.Status.UNAUTHORIZED,
+                    PrimerError.builder().errorCode("PR004").message("Unauthorized").build()
             );
         } else if (e.getCause() instanceof FeignException) {
             log.error("Feign error: {}", e.getMessage());
@@ -140,25 +140,22 @@ public abstract class AuthFilter implements ContainerRequestFilter {
             case NOT_FOUND:
             case UNAUTHORIZED:
                 PrimerAuthorizationRegistry.blacklist(token);
-                requestContext.abortWith(
-                        Response.status(Response.Status.UNAUTHORIZED.getStatusCode())
-                                .entity(objectMapper.writeValueAsBytes(PrimerError.builder().errorCode("PR004").message("Unauthorized")
-                                        .build())).build());
+                abortRequest(requestContext, Response.Status.UNAUTHORIZED, PrimerError.builder().errorCode("PR004").message("Unauthorized").build());
                 break;
             case FORBIDDEN:
                 PrimerAuthorizationRegistry.blacklist(token);
-                requestContext.abortWith(
-                        Response.status(Response.Status.FORBIDDEN.getStatusCode())
-                                .entity(objectMapper.writeValueAsBytes(PrimerError.builder().errorCode("PR002").message("Forbidden")
-                                        .build())).build());
+                abortRequest(requestContext, Response.Status.FORBIDDEN, PrimerError.builder().errorCode("PR002").message("Forbidden").build());
                 break;
             default:
-                requestContext.abortWith(
-                        Response.status(status)
-                                .entity(objectMapper.writeValueAsBytes(
-                                        PrimerError.builder().errorCode(errorCode).message(message).build()))
-                                .build());
+                abortRequest(requestContext, status, PrimerError.builder().errorCode(errorCode).message(message).build());
         }
     }
 
+    protected void abortRequest(ContainerRequestContext requestContext, Response.Status status, PrimerError primerError) throws JsonProcessingException {
+        requestContext.abortWith(
+                Response.status(status.getStatusCode())
+                        .entity(objectMapper.writeValueAsBytes(primerError))
+                        .build()
+        );
+    }
 }
