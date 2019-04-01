@@ -78,12 +78,6 @@ public class PrimerAuthAnnotationFilter extends AuthFilter {
                 //Stamp authorization headers for downstream services which can
                 // use this to stop token forgery & misuse
                 stampHeaders(requestContext, webToken);
-            } catch (ExecutionException e) {
-                if (e.getCause() instanceof PrimerException) {
-                    handleException(e.getCause(), requestContext, token.get());
-                } else {
-                    handleException(e, requestContext, token.get());
-                }
             } catch (UncheckedExecutionException e) {
                 if (e.getCause() instanceof CompletionException) {
                     handleException(e.getCause().getCause(), requestContext, token.get());
@@ -91,8 +85,11 @@ public class PrimerAuthAnnotationFilter extends AuthFilter {
                     handleException(e.getCause(), requestContext, token.get());
                 }
             } catch (Exception e) {
-                log.error("Execution error: {}", e.getMessage());
-                handleError(Response.Status.INTERNAL_SERVER_ERROR, "PR000", "Error", token.get(), requestContext);
+                if (e.getCause() instanceof PrimerException) {
+                    handleException(e.getCause(), requestContext, token.get());
+                } else {
+                    handleException(e, requestContext, token.get());
+                }
             }
         }
 
