@@ -68,7 +68,7 @@ public class PrimerAuthConfigFilter extends AuthFilter {
         Optional<String> token = getToken(requestContext);
         if (!token.isPresent()) {
             requestContext.abortWith(
-                    Response.status(Response.Status.BAD_REQUEST)
+                    Response.status(configuration.getAbsentTokenStatus())
                             .entity(objectMapper.writeValueAsBytes(PrimerError.builder().errorCode("PR000").message("Bad request")
                                     .build())).build()
             );
