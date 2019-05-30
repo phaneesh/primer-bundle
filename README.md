@@ -35,7 +35,7 @@ Use the following maven dependency:
 <dependency>
     <groupId>io.dropwizard.primer</groupId>
     <artifactId>primer-bundle</artifactId>
-    <version>1.3.7-7</version>
+    <version>1.3.7-8</version>
 </dependency>
 ```
 
@@ -69,6 +69,7 @@ primer:
   authTypesEnabled:
     CONFIG: true
     ANNOTATION: true
+  absentTokenStatus: BAD_REQUEST
   endpoint:
     type: simple
     host: my.primer.somewhere
