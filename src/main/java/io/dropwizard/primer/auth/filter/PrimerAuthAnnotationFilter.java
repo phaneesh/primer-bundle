@@ -22,7 +22,6 @@ import javax.ws.rs.ext.Provider;
 import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.ExecutionException;
 
 /**
  * Created by pavan.kumar on 2019-02-19
@@ -62,11 +61,8 @@ public class PrimerAuthAnnotationFilter extends AuthFilter {
                 JsonWebToken webToken = authorize(requestContext, token.get(), this.authType);
 
                 // Execute authorizer
-                if (authorizer != null && !authorizer.authorize(webToken, requestContext, authorize)) {
-                    // Abort request without blacklisting the token. FIXME: This should be controlled by the authorizer.
-                    abortRequest(requestContext, Response.Status.FORBIDDEN, PrimerError.builder().errorCode("PR002").message("Forbidden").build());
-                    return;
-                }
+                if (authorizer != null)
+                    authorizer.authorize(webToken, requestContext, authorize);
 
                 //Stamp authorization headers for downstream services which can
                 // use this to stop token forgery & misuse

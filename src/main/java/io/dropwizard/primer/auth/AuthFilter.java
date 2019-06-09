@@ -101,12 +101,12 @@ public abstract class AuthFilter implements ContainerRequestFilter {
             );
         } else if (e.getCause() instanceof FeignException) {
             log.error("Feign error: {}", e.getMessage());
-            handleError(Response.Status.fromStatusCode(((FeignException) e.getCause()).status()), "PR000", e.getCause().getMessage(), token,
+            handleError(Response.Status.fromStatusCode(((FeignException) e.getCause()).status()), "PR000", e.getCause().getMessage(), token, false,
                     requestContext);
 
         } else if (e instanceof FeignException) {
             log.error("Feign error: {}", e.getMessage());
-            handleError(Response.Status.fromStatusCode(((FeignException) e).status()), "PR000", e.getMessage(), token,
+            handleError(Response.Status.fromStatusCode(((FeignException) e).status()), "PR000", e.getMessage(), token, false,
                     requestContext);
         } else if (e.getCause() instanceof PrimerException) {
             PrimerException primerException = (PrimerException) e.getCause();
@@ -117,7 +117,7 @@ public abstract class AuthFilter implements ContainerRequestFilter {
                     primerException.getMessage(),
                     requestContext.getHeaders());
             handleError(Response.Status.fromStatusCode(((PrimerException) e.getCause()).getStatus()), ((PrimerException) e.getCause()).getErrorCode(),
-                    e.getCause().getMessage(), token, requestContext);
+                    e.getCause().getMessage(), token, ((PrimerException) e.getCause()).isRecoverable(), requestContext);
         } else if (e instanceof PrimerException) {
             PrimerException primerException = (PrimerException) e;
             log.error("Primer error: {}", e.getMessage());
@@ -127,23 +127,25 @@ public abstract class AuthFilter implements ContainerRequestFilter {
                     primerException.getMessage(),
                     requestContext.getHeaders());
             handleError(Response.Status.fromStatusCode(((PrimerException) e).getStatus()), ((PrimerException) e).getErrorCode(),
-                    e.getMessage(), token, requestContext);
+                    e.getMessage(), token, ((PrimerException) e).isRecoverable(), requestContext);
         } else {
             log.error("General error: ", e);
-            handleError(Response.Status.INTERNAL_SERVER_ERROR, "PR000", "Error", token, requestContext);
+            handleError(Response.Status.INTERNAL_SERVER_ERROR, "PR000", "Error", token, false, requestContext);
         }
     }
 
-    protected void handleError(Response.Status status, String errorCode, String message, String token,
+    protected void handleError(Response.Status status, String errorCode, String message, String token, boolean recoverable,
                              ContainerRequestContext requestContext) throws JsonProcessingException {
         switch (status) {
             case NOT_FOUND:
             case UNAUTHORIZED:
-                PrimerAuthorizationRegistry.blacklist(token);
+                if (!recoverable)
+                    PrimerAuthorizationRegistry.blacklist(token);
                 abortRequest(requestContext, Response.Status.UNAUTHORIZED, PrimerError.builder().errorCode("PR004").message("Unauthorized").build());
                 break;
             case FORBIDDEN:
-                PrimerAuthorizationRegistry.blacklist(token);
+                if (!recoverable)
+                    PrimerAuthorizationRegistry.blacklist(token);
                 abortRequest(requestContext, Response.Status.FORBIDDEN, PrimerError.builder().errorCode("PR002").message("Forbidden").build());
                 break;
             default:
