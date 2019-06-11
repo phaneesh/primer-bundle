@@ -22,7 +22,6 @@ import javax.ws.rs.ext.Provider;
 import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.ExecutionException;
 
 /**
  * Created by pavan.kumar on 2019-02-19
@@ -53,7 +52,7 @@ public class PrimerAuthAnnotationFilter extends AuthFilter {
         Optional<String> token = getToken(requestContext);
         if (!token.isPresent()) {
             requestContext.abortWith(
-                    Response.status(Response.Status.BAD_REQUEST)
+                    Response.status(configuration.getAbsentTokenStatus())
                             .entity(objectMapper.writeValueAsBytes(PrimerError.builder().errorCode("PR000").message("Bad request")
                                     .build())).build()
             );
@@ -62,18 +61,8 @@ public class PrimerAuthAnnotationFilter extends AuthFilter {
                 JsonWebToken webToken = authorize(requestContext, token.get(), this.authType);
 
                 // Execute authorizer
-                if (authorizer != null && !authorizer.authorize(webToken, requestContext, authorize)) {
-                    handleException(
-                            PrimerException.builder()
-                                    .errorCode("PR004")
-                                    .message("Unauthorized")
-                                    .status(401)
-                                    .build(),
-                            requestContext,
-                            token.get()
-                    );
-                    return;
-                }
+                if (authorizer != null)
+                    authorizer.authorize(webToken, requestContext, authorize);
 
                 //Stamp authorization headers for downstream services which can
                 // use this to stop token forgery & misuse

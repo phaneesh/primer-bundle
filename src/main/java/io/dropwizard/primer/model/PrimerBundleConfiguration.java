@@ -5,6 +5,7 @@ import io.dropwizard.primer.auth.AuthType;
 import lombok.*;
 
 import javax.validation.Valid;
+import javax.ws.rs.core.Response;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -34,6 +35,9 @@ public class PrimerBundleConfiguration {
     private boolean enabled = true;
 
     private Map<AuthType, Boolean> authTypesEnabled = ImmutableMap.of(AuthType.CONFIG, true, AuthType.ANNOTATION, false);
+
+    @Builder.Default
+    private Response.Status absentTokenStatus = Response.Status.BAD_REQUEST;
 
     @Singular("whiteList")
     private Set<String> whileListUrl = new HashSet<>();

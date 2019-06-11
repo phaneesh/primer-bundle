@@ -35,4 +35,6 @@ public class PrimerException extends Exception {
     private String errorCode;
 
     private String message;
+
+    private boolean recoverable;
 }
