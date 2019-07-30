@@ -35,7 +35,7 @@ Use the following maven dependency:
 <dependency>
     <groupId>io.dropwizard.primer</groupId>
     <artifactId>primer-bundle</artifactId>
-    <version>1.3.7-8</version>
+    <version>1.3.13-1</version>
 </dependency>
 ```
 
