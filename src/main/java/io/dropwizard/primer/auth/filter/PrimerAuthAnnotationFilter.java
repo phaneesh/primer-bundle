@@ -13,7 +13,6 @@ import io.dropwizard.primer.auth.whitelist.AuthWhitelistValidator;
 import io.dropwizard.primer.core.PrimerError;
 import io.dropwizard.primer.exception.PrimerException;
 import io.dropwizard.primer.model.PrimerBundleConfiguration;
-import io.dropwizard.primer.util.IPAddressUtil;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 
@@ -101,6 +100,6 @@ public class PrimerAuthAnnotationFilter extends AuthFilter {
     private boolean isWhitelisted() {
         // true if whitelisting criteria matches
         return authWhitelist != null
-                && authWhitelist.type().accept(new AuthWhitelistValidator(authWhitelist, IPAddressUtil.getIP(httpServletRequest)));
+                && authWhitelist.type().accept(new AuthWhitelistValidator(authWhitelist, httpServletRequest));
     }
 }
