@@ -38,7 +38,6 @@ import javax.ws.rs.ext.Provider;
 import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.ExecutionException;
 
 
 /**
@@ -58,13 +57,10 @@ public class PrimerAuthConfigFilter extends AuthFilter {
     @Override
     @Metered(name = "primer")
     public void filter(ContainerRequestContext requestContext) throws IOException {
-        if (!configuration.isEnabled() || !configuration.getAuthTypesEnabled().getOrDefault(AuthType.CONFIG, false)) {
+        // Do not proceed further with Auth if its disabled or whitelisted
+        if (!isEnabled() || isWhitelisted(requestContext))
             return;
-        }
-        //Short circuit for all white listed urls
-        if (PrimerAuthorizationRegistry.isWhilisted(requestContext.getUriInfo().getPath())) {
-            return;
-        }
+
         Optional<String> token = getToken(requestContext);
         if (!token.isPresent()) {
             requestContext.abortWith(
@@ -92,5 +88,15 @@ public class PrimerAuthConfigFilter extends AuthFilter {
                 }
             }
         }
+    }
+
+    private boolean isEnabled() {
+        return configuration.isEnabled()
+                && configuration.getAuthTypesEnabled().getOrDefault(AuthType.CONFIG, false);
+    }
+
+    private boolean isWhitelisted(ContainerRequestContext requestContext) {
+        //Short circuit for all white listed urls
+        return PrimerAuthorizationRegistry.isWhilisted(requestContext.getUriInfo().getPath());
     }
 }

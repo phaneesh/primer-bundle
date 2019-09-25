@@ -1,6 +1,7 @@
 package io.dropwizard.primer.auth;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.dropwizard.primer.auth.annotation.AuthWhitelist;
 import io.dropwizard.primer.auth.annotation.Authorize;
 import io.dropwizard.primer.auth.authorizer.PrimerAnnotationAuthorizer;
 import io.dropwizard.primer.auth.filter.PrimerAuthAnnotationFilter;
@@ -10,8 +11,7 @@ import lombok.Builder;
 import javax.ws.rs.container.DynamicFeature;
 import javax.ws.rs.container.ResourceInfo;
 import javax.ws.rs.core.FeatureContext;
-import java.lang.reflect.Method;
-import java.util.stream.Stream;
+import java.util.Optional;
 
 public class PrimerAuthAnnotationFeature implements DynamicFeature {
 
@@ -27,22 +27,19 @@ public class PrimerAuthAnnotationFeature implements DynamicFeature {
     }
 
     public void configure(ResourceInfo resourceInfo, FeatureContext featureContext) {
-        final Method resourceMethod = resourceInfo.getResourceMethod();
-        if (resourceMethod != null) {
-            Stream.of(resourceMethod.getDeclaredAnnotations())
-                    .filter(annotation -> annotation.annotationType().equals(Authorize.class))
-                    .map(Authorize.class::cast)
-                    .findFirst()
-                    .ifPresent(authorize ->
-                            featureContext.register(
-                                    PrimerAuthAnnotationFilter.builder()
-                                            .configuration(configuration)
-                                            .objectMapper(mapper)
-                                            .authorize(authorize)
-                                            .authorizer(authorizer)
-                                            .build()
-                            )
-                    );
-        }
+        Optional
+                .ofNullable(resourceInfo.getResourceMethod())
+                .map(resourceMethod -> resourceMethod.getAnnotation(Authorize.class))
+                .ifPresent(authorize ->
+                        featureContext.register(
+                                PrimerAuthAnnotationFilter.builder()
+                                        .configuration(configuration)
+                                        .objectMapper(mapper)
+                                        .authorize(authorize)
+                                        .authorizer(authorizer)
+                                        .authWhitelist(resourceInfo.getResourceMethod().getAnnotation(AuthWhitelist.class))
+                                        .build()
+                        )
+                );
     }
 }
