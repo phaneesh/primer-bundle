@@ -20,7 +20,6 @@ import javax.annotation.Priority;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Priorities;
 import javax.ws.rs.container.ContainerRequestContext;
-import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.Provider;
 import java.io.IOException;
@@ -35,17 +34,17 @@ import java.util.concurrent.CompletionException;
 @Priority(Priorities.AUTHENTICATION)
 public class PrimerAuthAnnotationFilter extends AuthFilter {
 
-    @Context
-    private HttpServletRequest httpServletRequest;
-
+    private final HttpServletRequest requestProxy;
     private final PrimerAnnotationAuthorizer authorizer;
     private final Authorize authorize;
     private final AuthWhitelist authWhitelist;
 
     @Builder
-    public PrimerAuthAnnotationFilter(PrimerBundleConfiguration configuration, ObjectMapper objectMapper,
-                                      Authorize authorize, PrimerAnnotationAuthorizer authorizer, AuthWhitelist authWhitelist) {
+    public PrimerAuthAnnotationFilter(HttpServletRequest requestProxy, PrimerBundleConfiguration configuration,
+                                      ObjectMapper objectMapper, Authorize authorize,
+                                      PrimerAnnotationAuthorizer authorizer, AuthWhitelist authWhitelist) {
         super(AuthType.ANNOTATION, configuration, objectMapper);
+        this.requestProxy = requestProxy;
         this.authorizer = authorizer;
         this.authorize = authorize;
         this.authWhitelist = authWhitelist;
@@ -100,6 +99,6 @@ public class PrimerAuthAnnotationFilter extends AuthFilter {
     private boolean isWhitelisted() {
         // true if whitelisting criteria matches
         return authWhitelist != null
-                && authWhitelist.type().accept(new AuthWhitelistValidator(authWhitelist, httpServletRequest));
+                && authWhitelist.type().accept(new AuthWhitelistValidator(authWhitelist, requestProxy));
     }
 }

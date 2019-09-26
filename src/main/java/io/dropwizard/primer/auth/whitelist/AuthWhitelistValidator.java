@@ -15,12 +15,12 @@ import java.util.Arrays;
 public class AuthWhitelistValidator implements WhitelistType.Visitor<Boolean> {
 
     private final AuthWhitelist authWhitelist;
-    private final HttpServletRequest httpServletRequest;
+    private final HttpServletRequest requestProxy;
 
     @Builder
-    public AuthWhitelistValidator(AuthWhitelist authWhitelist, HttpServletRequest httpServletRequest) {
+    public AuthWhitelistValidator(AuthWhitelist authWhitelist, HttpServletRequest requestProxy) {
         this.authWhitelist = authWhitelist;
-        this.httpServletRequest = httpServletRequest;
+        this.requestProxy = requestProxy;
     }
 
     /**
@@ -33,7 +33,7 @@ public class AuthWhitelistValidator implements WhitelistType.Visitor<Boolean> {
     @Override
     public Boolean visitOptional() {
         return Boolean.parseBoolean(authWhitelist.value())
-                && StringUtils.isNotBlank(httpServletRequest.getHeader(HttpHeaders.AUTHORIZATION));
+                && StringUtils.isNotBlank(requestProxy.getHeader(HttpHeaders.AUTHORIZATION));
     }
 
     /**
@@ -46,6 +46,6 @@ public class AuthWhitelistValidator implements WhitelistType.Visitor<Boolean> {
     public Boolean visitIP() {
         return Arrays
                 .asList(authWhitelist.value().split(","))
-                .contains(IPAddressUtil.getIP(httpServletRequest));
+                .contains(IPAddressUtil.getIP(requestProxy));
     }
 }

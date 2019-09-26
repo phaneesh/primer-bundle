@@ -8,12 +8,19 @@ import io.dropwizard.primer.auth.filter.PrimerAuthAnnotationFilter;
 import io.dropwizard.primer.model.PrimerBundleConfiguration;
 import lombok.Builder;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.container.DynamicFeature;
 import javax.ws.rs.container.ResourceInfo;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.FeatureContext;
+import javax.ws.rs.ext.Provider;
 import java.util.Optional;
 
+@Provider
 public class PrimerAuthAnnotationFeature implements DynamicFeature {
+
+    @Context
+    private HttpServletRequest requestProxy;
 
     private final PrimerBundleConfiguration configuration;
     private final ObjectMapper mapper;
@@ -33,6 +40,7 @@ public class PrimerAuthAnnotationFeature implements DynamicFeature {
                 .ifPresent(authorize ->
                         featureContext.register(
                                 PrimerAuthAnnotationFilter.builder()
+                                        .requestProxy(requestProxy)
                                         .configuration(configuration)
                                         .objectMapper(mapper)
                                         .authorize(authorize)
