@@ -33,7 +33,7 @@ public class AuthWhitelistValidator implements WhitelistType.Visitor<Boolean> {
     @Override
     public Boolean visitOptional() {
         return Boolean.parseBoolean(authWhitelist.value())
-                && StringUtils.isNotBlank(requestProxy.getHeader(HttpHeaders.AUTHORIZATION));
+                && StringUtils.isBlank(requestProxy.getHeader(HttpHeaders.AUTHORIZATION));
     }
 
     /**
