@@ -30,9 +30,9 @@ import feign.slf4j.Slf4jLogger;
 import io.dropwizard.Configuration;
 import io.dropwizard.ConfiguredBundle;
 import io.dropwizard.lifecycle.Managed;
-import io.dropwizard.primer.auth.PrimerAuthAnnotationFeature;
 import io.dropwizard.primer.auth.PrimerAuthorizationRegistry;
 import io.dropwizard.primer.auth.authorizer.PrimerAnnotationAuthorizer;
+import io.dropwizard.primer.auth.filter.PrimerAuthAnnotationFilter;
 import io.dropwizard.primer.auth.filter.PrimerAuthConfigFilter;
 import io.dropwizard.primer.client.PrimerClient;
 import io.dropwizard.primer.core.PrimerError;
@@ -198,11 +198,10 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
                 .configuration(getPrimerConfiguration(configuration))
                 .objectMapper(environment.getObjectMapper())
                 .build());
-
-        environment.jersey().register(PrimerAuthAnnotationFeature.builder()
+        environment.jersey().register(PrimerAuthAnnotationFilter.builder()
+                .configuration(getPrimerConfiguration(configuration))
+                .objectMapper(environment.getObjectMapper())
                 .authorizer(authorizer())
-                .configuration(primerConfig)
-                .mapper(environment.getObjectMapper())
                 .build());
     }
 

@@ -6,8 +6,10 @@ import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import io.dropwizard.primer.auth.AuthFilter;
 import io.dropwizard.primer.auth.AuthType;
+import io.dropwizard.primer.auth.annotation.AuthWhitelist;
 import io.dropwizard.primer.auth.annotation.Authorize;
 import io.dropwizard.primer.auth.authorizer.PrimerAnnotationAuthorizer;
+import io.dropwizard.primer.auth.whitelist.AuthWhitelistValidator;
 import io.dropwizard.primer.core.PrimerError;
 import io.dropwizard.primer.exception.PrimerException;
 import io.dropwizard.primer.model.PrimerBundleConfiguration;
@@ -15,11 +17,16 @@ import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.annotation.Priority;
+import javax.inject.Singleton;
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Priorities;
 import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.container.ResourceInfo;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.Provider;
 import java.io.IOException;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletionException;
 
@@ -29,25 +36,28 @@ import java.util.concurrent.CompletionException;
 @Slf4j
 @Provider
 @Priority(Priorities.AUTHENTICATION)
+@Singleton
 public class PrimerAuthAnnotationFilter extends AuthFilter {
 
+    @Context private HttpServletRequest requestProxy;
+    @Context private ResourceInfo resourceInfo;
+
     private final PrimerAnnotationAuthorizer authorizer;
-    private final Authorize authorize;
 
     @Builder
-    public PrimerAuthAnnotationFilter(PrimerBundleConfiguration configuration, ObjectMapper objectMapper,
-                                      Authorize authorize, PrimerAnnotationAuthorizer authorizer) {
+    public PrimerAuthAnnotationFilter(final PrimerBundleConfiguration configuration,
+                                      final ObjectMapper objectMapper,
+                                      final PrimerAnnotationAuthorizer authorizer) {
         super(AuthType.ANNOTATION, configuration, objectMapper);
         this.authorizer = authorizer;
-        this.authorize = authorize;
     }
 
     @Override
     @Metered(name = "authorize")
     public void filter(ContainerRequestContext requestContext) throws IOException {
-        if (!configuration.isEnabled() || !configuration.getAuthTypesEnabled().getOrDefault(AuthType.ANNOTATION, false)) {
+        // Do not proceed further with Auth if its disabled or whitelisted
+        if (!isEnabled() || isWhitelisted())
             return;
-        }
 
         Optional<String> token = getToken(requestContext);
         if (!token.isPresent()) {
@@ -62,7 +72,7 @@ public class PrimerAuthAnnotationFilter extends AuthFilter {
 
                 // Execute authorizer
                 if (authorizer != null)
-                    authorizer.authorize(webToken, requestContext, authorize);
+                    authorizer.authorize(webToken, requestContext, getAuthorizeAnnotation());
 
                 //Stamp authorization headers for downstream services which can
                 // use this to stop token forgery & misuse
@@ -81,6 +91,22 @@ public class PrimerAuthAnnotationFilter extends AuthFilter {
                 }
             }
         }
+    }
 
+    private boolean isEnabled() {
+        return configuration.isEnabled()
+                && configuration.getAuthTypesEnabled().getOrDefault(AuthType.ANNOTATION, false)
+                && Objects.nonNull(getAuthorizeAnnotation());
+    }
+
+    private boolean isWhitelisted() {
+        // true if whitelisting criteria matches
+        AuthWhitelist authWhitelist = resourceInfo.getResourceMethod().getAnnotation(AuthWhitelist.class);
+        return Objects.nonNull(authWhitelist)
+                && authWhitelist.type().accept(new AuthWhitelistValidator(authWhitelist, requestProxy));
+    }
+
+    private Authorize getAuthorizeAnnotation() {
+        return resourceInfo.getResourceMethod().getAnnotation(Authorize.class);
     }
 }
