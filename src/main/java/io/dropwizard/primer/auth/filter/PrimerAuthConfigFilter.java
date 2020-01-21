@@ -125,7 +125,8 @@ public class PrimerAuthConfigFilter extends AuthFilter {
       cipher.init(Cipher.DECRYPT_MODE, secretKeySpec, ivParameterSpec);
       return new String(cipher.doFinal(Base64.getDecoder().decode(token)));
     } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidAlgorithmParameterException
-        | InvalidKeyException | BadPaddingException | IllegalBlockSizeException | NoSuchProviderException e) {
+        | InvalidKeyException | BadPaddingException | IllegalBlockSizeException | NoSuchProviderException
+        | IllegalArgumentException e) {
       return token;
     }
   }
