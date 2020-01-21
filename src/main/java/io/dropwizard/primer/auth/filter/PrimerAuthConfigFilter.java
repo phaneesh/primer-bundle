@@ -124,9 +124,7 @@ public class PrimerAuthConfigFilter extends AuthFilter {
       Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding", "SunJCE");
       cipher.init(Cipher.DECRYPT_MODE, secretKeySpec, ivParameterSpec);
       return new String(cipher.doFinal(Base64.getDecoder().decode(token)));
-    } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidAlgorithmParameterException
-        | InvalidKeyException | BadPaddingException | IllegalBlockSizeException | NoSuchProviderException
-        | IllegalArgumentException e) {
+    } catch (Exception e) {
       return token;
     }
   }
