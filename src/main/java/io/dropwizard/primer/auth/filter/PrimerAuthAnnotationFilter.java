@@ -13,6 +13,7 @@ import io.dropwizard.primer.auth.whitelist.AuthWhitelistValidator;
 import io.dropwizard.primer.core.PrimerError;
 import io.dropwizard.primer.exception.PrimerException;
 import io.dropwizard.primer.model.PrimerBundleConfiguration;
+import io.dropwizard.primer.model.PrimerConfigurationHolder;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 
@@ -45,10 +46,10 @@ public class PrimerAuthAnnotationFilter extends AuthFilter {
     private final PrimerAnnotationAuthorizer authorizer;
 
     @Builder
-    public PrimerAuthAnnotationFilter(final PrimerBundleConfiguration configuration,
+    public PrimerAuthAnnotationFilter(final PrimerConfigurationHolder configHolder,
                                       final ObjectMapper objectMapper,
                                       final PrimerAnnotationAuthorizer authorizer) {
-        super(AuthType.ANNOTATION, configuration, objectMapper);
+        super(AuthType.ANNOTATION, configHolder, objectMapper);
         this.authorizer = authorizer;
     }
 
@@ -62,7 +63,7 @@ public class PrimerAuthAnnotationFilter extends AuthFilter {
         Optional<String> token = getToken(requestContext);
         if (!token.isPresent()) {
             requestContext.abortWith(
-                    Response.status(configuration.getAbsentTokenStatus())
+                    Response.status(configHolder.getConfig().getAbsentTokenStatus())
                             .entity(objectMapper.writeValueAsBytes(PrimerError.builder().errorCode("PR000").message("Bad request")
                                     .build())).build()
             );
@@ -94,8 +95,8 @@ public class PrimerAuthAnnotationFilter extends AuthFilter {
     }
 
     private boolean isEnabled() {
-        return configuration.isEnabled()
-                && configuration.getAuthTypesEnabled().getOrDefault(AuthType.ANNOTATION, false)
+        return configHolder.getConfig().isEnabled()
+                && configHolder.getConfig().getAuthTypesEnabled().getOrDefault(AuthType.ANNOTATION, false)
                 && Objects.nonNull(getAuthorizeAnnotation());
     }
 

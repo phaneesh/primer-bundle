@@ -41,11 +41,13 @@ import io.dropwizard.primer.exception.PrimerException;
 import io.dropwizard.primer.exception.PrimerExceptionMapper;
 import io.dropwizard.primer.model.PrimerAuthorizationMatrix;
 import io.dropwizard.primer.model.PrimerBundleConfiguration;
+import io.dropwizard.primer.model.PrimerConfigurationHolder;
 import io.dropwizard.primer.model.PrimerRangerEndpoint;
 import io.dropwizard.primer.model.PrimerSimpleEndpoint;
 import io.dropwizard.server.DefaultServerFactory;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
 import org.apache.curator.framework.CuratorFramework;
@@ -76,13 +78,10 @@ import java.util.Set;
 @Slf4j
 public abstract class PrimerBundle<T extends Configuration> implements ConfiguredBundle<T> {
 
-  //private static List<String> whiteList = new ArrayList<>();
-
   private static PrimerClient primerClient = null;
 
-  private SecretKeySpec secretKeySpec;
-
-  private GCMParameterSpec ivParameterSpec;
+  @Getter
+  private PrimerConfigurationHolder configHolder;
 
   public abstract PrimerBundleConfiguration getPrimerConfiguration(T configuration);
 
@@ -122,14 +121,12 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
   @Override
   public void run(T configuration, Environment environment) {
     final val primerConfig = getPrimerConfiguration(configuration);
-    final JsonWebTokenParser tokenParser = new DefaultJsonWebTokenParser();
-    final byte[] secretKey = primerConfig.getPrivateKey().getBytes(StandardCharsets.UTF_8);
-    final HmacSHA512Verifier tokenVerifier = new HmacSHA512Verifier(secretKey);
-    this.secretKeySpec = new SecretKeySpec(Hashing.murmur3_128().hashString(primerConfig.getPrivateKey(), StandardCharsets.UTF_8).asBytes(), "AES");
-    this.ivParameterSpec = new GCMParameterSpec(16 * 8,
-        Arrays.copyOf(primerConfig.getPrivateKey().getBytes(), 8));
 
-    initializeAuthorization(configuration, tokenParser, tokenVerifier);
+    configHolder = new PrimerConfigurationHolder(primerConfig);
+
+    initializeAuthorization(configuration);
+    PrimerAuthorizationRegistry.initCache(configHolder.getConfig());
+
     final JacksonDecoder decoder = new JacksonDecoder();
     final JacksonEncoder encoder = new JacksonEncoder();
     final Slf4jLogger logger = new Slf4jLogger();
@@ -204,15 +201,23 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
 
       }
     });
+
     environment.jersey().register(new PrimerExceptionMapper());
+
+    SecretKeySpec secretKeySpec = new SecretKeySpec(
+            Hashing.murmur3_128().hashString(configHolder.getConfig().getPrivateKey(),
+                    StandardCharsets.UTF_8).asBytes(), "AES");
+    GCMParameterSpec ivParameterSpec = new GCMParameterSpec(16 * 8,
+            Arrays.copyOf(configHolder.getConfig().getPrivateKey().getBytes(), 8));
     environment.jersey().register(PrimerAuthConfigFilter.builder()
-        .configuration(getPrimerConfiguration(configuration))
+        .configHolder(configHolder)
         .objectMapper(environment.getObjectMapper())
         .secretKeySpec(secretKeySpec)
         .ivParameterSpec(ivParameterSpec)
         .build());
+
     environment.jersey().register(PrimerAuthAnnotationFilter.builder()
-        .configuration(getPrimerConfiguration(configuration))
+        .configHolder(configHolder)
         .objectMapper(environment.getObjectMapper())
         .authorizer(authorizer())
         .build());
@@ -239,8 +244,13 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
     }
   }
 
-  private void initializeAuthorization(T configuration, JsonWebTokenParser tokenParser, HmacSHA512Verifier tokenVerifier) {
-    final val primerConfig = getPrimerConfiguration(configuration);
+  public void initializeAuthorization(T configuration) {
+    final JsonWebTokenParser tokenParser = new DefaultJsonWebTokenParser();
+    PrimerBundleConfiguration primerConfig = configHolder.getConfig();
+
+    final byte[] secretKey = primerConfig.getPrivateKey().getBytes(StandardCharsets.UTF_8);
+    final HmacSHA512Verifier tokenVerifier = new HmacSHA512Verifier(secretKey);
+
     final Set<String> whiteListUrls = new HashSet<>();
     final Set<String> dynamicWhiteList = withWhiteList(configuration);
     if (dynamicWhiteList != null) {
@@ -273,4 +283,5 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
     }
     PrimerAuthorizationRegistry.init(permissionMatrix, whiteListUrls, primerConfig, tokenParser, tokenVerifier);
   }
+
 }

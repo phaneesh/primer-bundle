@@ -45,11 +45,11 @@ import java.util.regex.Pattern;
 @Slf4j
 public class PrimerAuthorizationRegistry {
 
-    private static Map<String, PrimerAuthorization> authList;
+    private static Map<String, PrimerAuthorization> primerAuthList;
 
-    private static List<String> whiteList;
+    private static List<String> primerWhitelist;
 
-    private static List<String> urlPatterns;
+    private static List<String> primerUrlPatterns;
 
     private static LoadingCache<String, Optional<Boolean>> blacklistCache;
 
@@ -59,16 +59,16 @@ public class PrimerAuthorizationRegistry {
     private static HmacSHA512Verifier verifier;
     private static ExpiryValidator expiryValidator;
 
-
     public static void init(PrimerAuthorizationMatrix matrix,
                             Set<String> whiteListUrls, PrimerBundleConfiguration configuration,
                             JsonWebTokenParser tokenParser, HmacSHA512Verifier tokenVerifier) {
-        authList = new HashMap<>();
-        whiteList = new ArrayList<>();
-        urlPatterns = new ArrayList<>();
         parser = tokenParser;
         verifier = tokenVerifier;
+
         val tokenMatch = Pattern.compile("\\{(([^/])+\\})");
+
+        Map<String, PrimerAuthorization> authList = new HashMap<>();
+        List<String> urlPatterns = new ArrayList<>();
         if (matrix != null) {
             if(matrix.getAuthorizations() != null) {
                 matrix.getAuthorizations().forEach(auth -> {
@@ -94,18 +94,32 @@ public class PrimerAuthorizationRegistry {
             urlPatterns.sort((o1, o2) -> tokenMatch.matcher(o2).groupCount() - tokenMatch.matcher(o1).groupCount());
             urlPatterns.sort(Comparator.reverseOrder());
         }
+
+        primerAuthList = authList;
+        primerWhitelist = primerWhitelistedUrls(whiteListUrls, tokenMatch);
+        primerUrlPatterns = urlPatterns;
+
+        expiryValidator = new ExpiryValidator(new Duration(configuration.getClockSkew()));
+    }
+
+    public static void initCache(PrimerBundleConfiguration configuration){
+        blacklistCache = Caffeine.newBuilder()
+                .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
+                .maximumSize(configuration.getCacheMaxSize())
+                .build(key -> Optional.of(false));
+        lruCache = Caffeine.newBuilder()
+                .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
+                .maximumSize(configuration.getCacheMaxSize())
+                .build(PrimerAuthorizationRegistry::verifyToken);
+    }
+
+    private static List<String> primerWhitelistedUrls(Set<String> whiteListUrls, Pattern tokenMatch) {
+        List<String> whiteList = new ArrayList<>();
+
         whiteListUrls.forEach(url -> whiteList.add(generatePathExpression(url)));
         whiteList.sort((o1, o2) -> tokenMatch.matcher(o2).groupCount() - tokenMatch.matcher(o1).groupCount());
         whiteList.sort(Comparator.reverseOrder());
-        blacklistCache = Caffeine.newBuilder()
-                        .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
-                        .maximumSize(configuration.getCacheMaxSize())
-                        .build(key -> Optional.of(false));
-        lruCache = Caffeine.newBuilder()
-                        .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
-                        .maximumSize(configuration.getCacheMaxSize())
-                .build(PrimerAuthorizationRegistry::verifyToken);
-        expiryValidator = new ExpiryValidator(new Duration(configuration.getClockSkew()));
+        return whiteList;
     }
 
     private static String generatePathExpression(final String path) {
@@ -122,12 +136,12 @@ public class PrimerAuthorizationRegistry {
     }
 
     public static boolean isWhilisted(final String path) {
-        return whiteList.stream()
+        return primerWhitelist.stream()
                 .anyMatch(path::matches);
     }
 
     private static boolean isAuthorized(final String id, final String method, final String role) {
-        return authList.get(id).getRoles().contains(role) && authList.get(id).getMethods().contains(method);
+        return primerAuthList.get(id).getRoles().contains(role) && primerAuthList.get(id).getMethods().contains(method);
     }
 
     private static JsonWebToken verify(JsonWebToken webToken, String token, String type) throws PrimerException {
@@ -190,7 +204,7 @@ public class PrimerAuthorizationRegistry {
         verifier.verifySignature(webToken);
         expiryValidator.validate(webToken);
         final String role = (String) webToken.claim().getParameter("role");
-        val index = urlPatterns.stream().filter(tokenKey.getPath()::matches).findFirst();
+        val index = primerUrlPatterns.stream().filter(tokenKey.getPath()::matches).findFirst();
         if (!index.isPresent()) {
             log.debug("No index found for {}", tokenKey);
             throw PrimerException.builder()
@@ -209,7 +223,7 @@ public class PrimerAuthorizationRegistry {
                     .status(401)
                     .build();
         }
-        switch (authList.get(index.get()).getType()) {
+        switch (primerAuthList.get(index.get()).getType()) {
             case "dynamic":
                 return verify(webToken, tokenKey.getToken(), "dynamic");
             case "static":
@@ -219,7 +233,7 @@ public class PrimerAuthorizationRegistry {
                 return verify(webToken, tokenKey.getToken(), type);
             default:
                 log.debug("invalid_token_type for index:{} token:{}",
-                        authList.get(index.get()).getType(), tokenKey);
+                        primerAuthList.get(index.get()).getType(), tokenKey);
                 throw PrimerException.builder()
                         .errorCode("PR004")
                         .message("Unauthorized")
