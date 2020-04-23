@@ -91,6 +91,8 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
 
   public abstract PrimerAnnotationAuthorizer authorizer();
 
+  public abstract String getPrimerConfigAttribute();
+
   public static PrimerClient getPrimerClient() {
     return primerClient;
   }
