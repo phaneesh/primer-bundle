@@ -13,10 +13,13 @@ import io.dropwizard.primer.auth.whitelist.AuthWhitelistValidator;
 import io.dropwizard.primer.core.PrimerError;
 import io.dropwizard.primer.exception.PrimerException;
 import io.dropwizard.primer.model.PrimerBundleConfiguration;
+import io.dropwizard.primer.util.CryptUtil;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.annotation.Priority;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import javax.inject.Singleton;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Priorities;
@@ -44,12 +47,20 @@ public class PrimerAuthAnnotationFilter extends AuthFilter {
 
     private final PrimerAnnotationAuthorizer authorizer;
 
+    private final SecretKeySpec secretKeySpec;
+
+    private final GCMParameterSpec ivParameterSpec;
+
     @Builder
     public PrimerAuthAnnotationFilter(final PrimerBundleConfiguration configuration,
                                       final ObjectMapper objectMapper,
-                                      final PrimerAnnotationAuthorizer authorizer) {
+                                      final PrimerAnnotationAuthorizer authorizer,
+                                      final SecretKeySpec secretKeySpec,
+                                      final GCMParameterSpec ivParameterSpec) {
         super(AuthType.ANNOTATION, configuration, objectMapper);
         this.authorizer = authorizer;
+        this.secretKeySpec = secretKeySpec;
+        this.ivParameterSpec = ivParameterSpec;
     }
 
     @Override
@@ -68,7 +79,8 @@ public class PrimerAuthAnnotationFilter extends AuthFilter {
             );
         } else {
             try {
-                JsonWebToken webToken = authorize(requestContext, token.get(), this.authType);
+                final String decryptedToken = CryptUtil.tokenDecrypt(token.get(), secretKeySpec, ivParameterSpec);
+                JsonWebToken webToken = authorize(requestContext, decryptedToken, this.authType);
 
                 // Execute authorizer
                 if (authorizer != null)

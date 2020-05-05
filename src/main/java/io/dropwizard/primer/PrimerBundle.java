@@ -215,6 +215,8 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
         .configuration(getPrimerConfiguration(configuration))
         .objectMapper(environment.getObjectMapper())
         .authorizer(authorizer())
+        .secretKeySpec(secretKeySpec)
+        .ivParameterSpec(ivParameterSpec)
         .build());
   }
 
