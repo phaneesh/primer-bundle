@@ -71,7 +71,8 @@ public abstract class BaseTest {
         }
 
         @Override
-        public PrimerAuthorizationMatrix withAuthorization(Configuration configuration) {
+        public PrimerAuthorizationMatrix
+        withAuthorization(Configuration configuration) {
             return PrimerAuthorizationMatrix.builder()
                     .authorization(PrimerAuthorization.builder()
                             .type("dynamic")
@@ -84,6 +85,11 @@ public abstract class BaseTest {
         @Override
         public PrimerAnnotationAuthorizer authorizer() {
             return PrimerRoleAuthorizer.builder().build();
+        }
+
+        @Override
+        public String getPrimerConfigAttribute() {
+            return "primer";
         }
     };
 
