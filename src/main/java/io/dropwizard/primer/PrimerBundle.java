@@ -127,7 +127,6 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
     configHolder = new PrimerConfigurationHolder(primerConfig);
 
     initializeAuthorization(configuration);
-    PrimerAuthorizationRegistry.initCache(configHolder.getConfig());
 
     final JacksonDecoder decoder = new JacksonDecoder();
     final JacksonEncoder encoder = new JacksonEncoder();

@@ -100,9 +100,6 @@ public class PrimerAuthorizationRegistry {
         primerUrlPatterns = urlPatterns;
 
         expiryValidator = new ExpiryValidator(new Duration(configuration.getClockSkew()));
-    }
-
-    public static void initCache(PrimerBundleConfiguration configuration){
         blacklistCache = Caffeine.newBuilder()
                 .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
                 .maximumSize(configuration.getCacheMaxSize())
