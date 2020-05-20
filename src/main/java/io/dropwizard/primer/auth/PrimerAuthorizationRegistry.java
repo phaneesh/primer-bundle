@@ -45,11 +45,11 @@ import java.util.regex.Pattern;
 @Slf4j
 public class PrimerAuthorizationRegistry {
 
-    private static Map<String, PrimerAuthorization> primerAuthList;
+    private static Map<String, PrimerAuthorization> authList;
 
-    private static List<String> primerWhitelist;
+    private static List<String> whitelist;
 
-    private static List<String> primerUrlPatterns;
+    private static List<String> urlPatterns;
 
     private static LoadingCache<String, Optional<Boolean>> blacklistCache;
 
@@ -95,9 +95,9 @@ public class PrimerAuthorizationRegistry {
             urlPatterns.sort(Comparator.reverseOrder());
         }
 
-        primerAuthList = authList;
-        primerWhitelist = primerWhitelistedUrls(whiteListUrls, tokenMatch);
-        primerUrlPatterns = urlPatterns;
+        PrimerAuthorizationRegistry.authList = authList;
+        PrimerAuthorizationRegistry.whitelist = primerWhitelistedUrls(whiteListUrls, tokenMatch);
+        PrimerAuthorizationRegistry.urlPatterns = urlPatterns;
 
         expiryValidator = new ExpiryValidator(new Duration(configuration.getClockSkew()));
         blacklistCache = Caffeine.newBuilder()
@@ -133,12 +133,12 @@ public class PrimerAuthorizationRegistry {
     }
 
     public static boolean isWhilisted(final String path) {
-        return primerWhitelist.stream()
+        return whitelist.stream()
                 .anyMatch(path::matches);
     }
 
     private static boolean isAuthorized(final String id, final String method, final String role) {
-        return primerAuthList.get(id).getRoles().contains(role) && primerAuthList.get(id).getMethods().contains(method);
+        return authList.get(id).getRoles().contains(role) && authList.get(id).getMethods().contains(method);
     }
 
     private static JsonWebToken verify(JsonWebToken webToken, String token, String type) throws PrimerException {
@@ -201,7 +201,7 @@ public class PrimerAuthorizationRegistry {
         verifier.verifySignature(webToken);
         expiryValidator.validate(webToken);
         final String role = (String) webToken.claim().getParameter("role");
-        val index = primerUrlPatterns.stream().filter(tokenKey.getPath()::matches).findFirst();
+        val index = urlPatterns.stream().filter(tokenKey.getPath()::matches).findFirst();
         if (!index.isPresent()) {
             log.debug("No index found for {}", tokenKey);
             throw PrimerException.builder()
@@ -220,7 +220,7 @@ public class PrimerAuthorizationRegistry {
                     .status(401)
                     .build();
         }
-        switch (primerAuthList.get(index.get()).getType()) {
+        switch (authList.get(index.get()).getType()) {
             case "dynamic":
                 return verify(webToken, tokenKey.getToken(), "dynamic");
             case "static":
@@ -230,7 +230,7 @@ public class PrimerAuthorizationRegistry {
                 return verify(webToken, tokenKey.getToken(), type);
             default:
                 log.debug("invalid_token_type for index:{} token:{}",
-                        primerAuthList.get(index.get()).getType(), tokenKey);
+                        authList.get(index.get()).getType(), tokenKey);
                 throw PrimerException.builder()
                         .errorCode("PR004")
                         .message("Unauthorized")
