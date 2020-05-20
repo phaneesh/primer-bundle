@@ -47,7 +47,7 @@ public class PrimerAuthorizationRegistry {
 
     private static Map<String, PrimerAuthorization> authList;
 
-    private static List<String> whitelist;
+    private static List<String> whiteList;
 
     private static List<String> urlPatterns;
 
@@ -96,7 +96,7 @@ public class PrimerAuthorizationRegistry {
         }
 
         PrimerAuthorizationRegistry.authList = authList;
-        PrimerAuthorizationRegistry.whitelist = primerWhitelistedUrls(whiteListUrls, tokenMatch);
+        PrimerAuthorizationRegistry.whiteList = primerWhitelistedUrls(whiteListUrls, tokenMatch);
         PrimerAuthorizationRegistry.urlPatterns = urlPatterns;
 
         expiryValidator = new ExpiryValidator(new Duration(configuration.getClockSkew()));
@@ -133,7 +133,7 @@ public class PrimerAuthorizationRegistry {
     }
 
     public static boolean isWhilisted(final String path) {
-        return whitelist.stream()
+        return whiteList.stream()
                 .anyMatch(path::matches);
     }
 
