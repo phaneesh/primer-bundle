@@ -25,16 +25,12 @@ import io.dropwizard.primer.auth.AuthType;
 import io.dropwizard.primer.auth.PrimerAuthorizationRegistry;
 import io.dropwizard.primer.core.PrimerError;
 import io.dropwizard.primer.exception.PrimerException;
-import io.dropwizard.primer.model.PrimerBundleConfiguration;
+import io.dropwizard.primer.util.CryptUtil;
 import io.dropwizard.primer.model.PrimerConfigurationHolder;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.annotation.Priority;
-import javax.crypto.BadPaddingException;
-import javax.crypto.Cipher;
-import javax.crypto.IllegalBlockSizeException;
-import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.inject.Singleton;
@@ -43,11 +39,6 @@ import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.Provider;
 import java.io.IOException;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
-import java.util.Base64;
 import java.util.Optional;
 import java.util.concurrent.CompletionException;
 
@@ -89,7 +80,7 @@ public class PrimerAuthConfigFilter extends AuthFilter {
       );
     } else {
       try {
-        final String decryptedToken = tokenDecrypt(token.get());
+        final String decryptedToken = CryptUtil.tokenDecrypt(token.get(), secretKeySpec, ivParameterSpec);
         JsonWebToken webToken = authorize(requestContext, decryptedToken, this.authType);
         //Stamp authorization headers for downstream services which can
         // use this to stop token forgery & misuse
@@ -118,15 +109,5 @@ public class PrimerAuthConfigFilter extends AuthFilter {
   private boolean isWhitelisted(ContainerRequestContext requestContext) {
     //Short circuit for all white listed urls
     return PrimerAuthorizationRegistry.isWhilisted(requestContext.getUriInfo().getPath());
-  }
-
-  public String tokenDecrypt(final String token) {
-    try {
-      Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding", "SunJCE");
-      cipher.init(Cipher.DECRYPT_MODE, secretKeySpec, ivParameterSpec);
-      return new String(cipher.doFinal(Base64.getDecoder().decode(token)));
-    } catch (Exception e) {
-      return token;
-    }
   }
 }
