@@ -25,8 +25,8 @@ import io.dropwizard.primer.auth.AuthType;
 import io.dropwizard.primer.auth.PrimerAuthorizationRegistry;
 import io.dropwizard.primer.core.PrimerError;
 import io.dropwizard.primer.exception.PrimerException;
-import io.dropwizard.primer.model.PrimerBundleConfiguration;
 import io.dropwizard.primer.util.CryptUtil;
+import io.dropwizard.primer.model.PrimerConfigurationHolder;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 
@@ -57,9 +57,9 @@ public class PrimerAuthConfigFilter extends AuthFilter {
   private final GCMParameterSpec ivParameterSpec;
 
   @Builder
-  public PrimerAuthConfigFilter(final PrimerBundleConfiguration configuration, final ObjectMapper objectMapper,
+  public PrimerAuthConfigFilter(final PrimerConfigurationHolder configHolder, final ObjectMapper objectMapper,
                                 final SecretKeySpec secretKeySpec, final GCMParameterSpec ivParameterSpec) {
-    super(AuthType.CONFIG, configuration, objectMapper);
+    super(AuthType.CONFIG, configHolder, objectMapper);
     this.secretKeySpec = secretKeySpec;
     this.ivParameterSpec = ivParameterSpec;
   }
@@ -74,7 +74,7 @@ public class PrimerAuthConfigFilter extends AuthFilter {
     Optional<String> token = getToken(requestContext);
     if (!token.isPresent()) {
       requestContext.abortWith(
-          Response.status(configuration.getAbsentTokenStatus())
+          Response.status(configHolder.getConfig().getAbsentTokenStatus())
               .entity(objectMapper.writeValueAsBytes(PrimerError.builder().errorCode("PR000").message("Bad request")
                   .build())).build()
       );
@@ -102,8 +102,8 @@ public class PrimerAuthConfigFilter extends AuthFilter {
   }
 
   private boolean isEnabled() {
-    return configuration.isEnabled()
-        && configuration.getAuthTypesEnabled().getOrDefault(AuthType.CONFIG, false);
+    return configHolder.getConfig().isEnabled()
+        && configHolder.getConfig().getAuthTypesEnabled().getOrDefault(AuthType.CONFIG, false);
   }
 
   private boolean isWhitelisted(ContainerRequestContext requestContext) {

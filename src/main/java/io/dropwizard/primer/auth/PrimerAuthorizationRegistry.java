@@ -59,16 +59,16 @@ public class PrimerAuthorizationRegistry {
     private static HmacSHA512Verifier verifier;
     private static ExpiryValidator expiryValidator;
 
-
     public static void init(PrimerAuthorizationMatrix matrix,
                             Set<String> whiteListUrls, PrimerBundleConfiguration configuration,
                             JsonWebTokenParser tokenParser, HmacSHA512Verifier tokenVerifier) {
-        authList = new HashMap<>();
-        whiteList = new ArrayList<>();
-        urlPatterns = new ArrayList<>();
         parser = tokenParser;
         verifier = tokenVerifier;
+
         val tokenMatch = Pattern.compile("\\{(([^/])+\\})");
+
+        Map<String, PrimerAuthorization> authList = new HashMap<>();
+        List<String> urlPatterns = new ArrayList<>();
         if (matrix != null) {
             if(matrix.getAuthorizations() != null) {
                 matrix.getAuthorizations().forEach(auth -> {
@@ -94,18 +94,29 @@ public class PrimerAuthorizationRegistry {
             urlPatterns.sort((o1, o2) -> tokenMatch.matcher(o2).groupCount() - tokenMatch.matcher(o1).groupCount());
             urlPatterns.sort(Comparator.reverseOrder());
         }
+
+        PrimerAuthorizationRegistry.authList = authList;
+        PrimerAuthorizationRegistry.whiteList = primerWhitelistedUrls(whiteListUrls, tokenMatch);
+        PrimerAuthorizationRegistry.urlPatterns = urlPatterns;
+
+        expiryValidator = new ExpiryValidator(new Duration(configuration.getClockSkew()));
+        blacklistCache = Caffeine.newBuilder()
+                .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
+                .maximumSize(configuration.getCacheMaxSize())
+                .build(key -> Optional.of(false));
+        lruCache = Caffeine.newBuilder()
+                .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
+                .maximumSize(configuration.getCacheMaxSize())
+                .build(PrimerAuthorizationRegistry::verifyToken);
+    }
+
+    private static List<String> primerWhitelistedUrls(Set<String> whiteListUrls, Pattern tokenMatch) {
+        List<String> whiteList = new ArrayList<>();
+
         whiteListUrls.forEach(url -> whiteList.add(generatePathExpression(url)));
         whiteList.sort((o1, o2) -> tokenMatch.matcher(o2).groupCount() - tokenMatch.matcher(o1).groupCount());
         whiteList.sort(Comparator.reverseOrder());
-        blacklistCache = Caffeine.newBuilder()
-                        .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
-                        .maximumSize(configuration.getCacheMaxSize())
-                        .build(key -> Optional.of(false));
-        lruCache = Caffeine.newBuilder()
-                        .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
-                        .maximumSize(configuration.getCacheMaxSize())
-                .build(PrimerAuthorizationRegistry::verifyToken);
-        expiryValidator = new ExpiryValidator(new Duration(configuration.getClockSkew()));
+        return whiteList;
     }
 
     private static String generatePathExpression(final String path) {

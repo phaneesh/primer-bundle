@@ -11,6 +11,7 @@ import feign.FeignException;
 import io.dropwizard.primer.core.PrimerError;
 import io.dropwizard.primer.exception.PrimerException;
 import io.dropwizard.primer.model.PrimerBundleConfiguration;
+import io.dropwizard.primer.model.PrimerConfigurationHolder;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.ws.rs.container.ContainerRequestContext;
@@ -27,7 +28,7 @@ import java.util.concurrent.ExecutionException;
 public abstract class AuthFilter implements ContainerRequestFilter {
 
     protected final AuthType authType;
-    protected final PrimerBundleConfiguration configuration;
+    protected final PrimerConfigurationHolder configHolder;
     protected final ObjectMapper objectMapper;
 
     private static final String AUTHORIZED_FOR_ID = "X-AUTHORIZED-FOR-ID";
@@ -35,9 +36,9 @@ public abstract class AuthFilter implements ContainerRequestFilter {
     private static final String AUTHORIZED_FOR_NAME = "X-AUTHORIZED-FOR-NAME";
     private static final String AUTHORIZED_FOR_ROLE = "X-AUTHORIZED-FOR-ROLE";
 
-    protected AuthFilter(AuthType authType, PrimerBundleConfiguration configuration, ObjectMapper objectMapper) {
+    protected AuthFilter(AuthType authType, PrimerConfigurationHolder configHolder, ObjectMapper objectMapper) {
         this.authType = authType;
-        this.configuration = configuration;
+        this.configHolder = configHolder;
         this.objectMapper = objectMapper;
     }
 
@@ -49,7 +50,7 @@ public abstract class AuthFilter implements ContainerRequestFilter {
         final String header = requestContext.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
         log.debug("Authorization Header: {}", header);
         if (header != null) {
-            final String rawToken = header.replaceAll(configuration.getPrefix(), "").trim();
+            final String rawToken = header.replaceAll(configHolder.getConfig().getPrefix(), "").trim();
             if (Strings.isNullOrEmpty(rawToken)) {
                 return Optional.empty();
             }

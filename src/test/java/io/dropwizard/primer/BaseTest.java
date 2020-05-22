@@ -35,6 +35,7 @@ import io.dropwizard.primer.model.PrimerBundleConfiguration;
 import io.dropwizard.primer.model.PrimerSimpleEndpoint;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
+import java.util.Collections;
 import org.joda.time.DateTime;
 import org.junit.Before;
 
@@ -71,19 +72,25 @@ public abstract class BaseTest {
         }
 
         @Override
-        public PrimerAuthorizationMatrix withAuthorization(Configuration configuration) {
+        public PrimerAuthorizationMatrix
+        withAuthorization(Configuration configuration) {
             return PrimerAuthorizationMatrix.builder()
-                    .authorization(PrimerAuthorization.builder()
+                    .authorizations(Collections.singletonList(PrimerAuthorization.builder()
                             .type("dynamic")
                             .method("GET")
                             .role("test")
                             .url("simple/auth/test")
-                    .build()).build();
+                    .build())).build();
         }
 
         @Override
         public PrimerAnnotationAuthorizer authorizer() {
             return PrimerRoleAuthorizer.builder().build();
+        }
+
+        @Override
+        public String getPrimerConfigAttribute() {
+            return "primer";
         }
     };
 

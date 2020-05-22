@@ -29,13 +29,10 @@ import java.util.List;
 @Builder
 public class PrimerAuthorizationMatrix {
 
-    @Singular
     List<PrimerAuthorization> staticAuthorizations;
 
-    @Singular
     List<PrimerAuthorization> authorizations;
 
-    @Singular
     List<PrimerAuthorization> autoAuthorizations;
 
 }
