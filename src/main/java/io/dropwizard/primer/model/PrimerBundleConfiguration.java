@@ -6,6 +6,7 @@ import lombok.*;
 
 import javax.validation.Valid;
 import javax.ws.rs.core.Response;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -43,4 +44,9 @@ public class PrimerBundleConfiguration {
     private Set<String> whileListUrl = new HashSet<>();
 
     private PrimerAuthorizationMatrix authorizations;
+
+    private boolean cookiesEnabled;
+
+    private Map<String, PrimerCookie> cookiesConfigs = new HashMap<>();  // {service_name, service_cookie_config}
+
 }

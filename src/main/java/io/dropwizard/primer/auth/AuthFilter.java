@@ -10,12 +10,14 @@ import com.google.common.base.Strings;
 import feign.FeignException;
 import io.dropwizard.primer.core.PrimerError;
 import io.dropwizard.primer.exception.PrimerException;
-import io.dropwizard.primer.model.PrimerBundleConfiguration;
 import io.dropwizard.primer.model.PrimerConfigurationHolder;
+import io.dropwizard.primer.model.PrimerCookie;
+import io.dropwizard.primer.util.AesUtils;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
+import javax.ws.rs.core.Cookie;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import java.util.Optional;
@@ -42,11 +44,14 @@ public abstract class AuthFilter implements ContainerRequestFilter {
         this.objectMapper = objectMapper;
     }
 
-    protected JsonWebToken authorize(ContainerRequestContext requestContext, String token, AuthType authType) throws ExecutionException {
+    protected JsonWebToken authorize(ContainerRequestContext requestContext, String token, AuthType authType) {
         return PrimerAuthorizationRegistry.authorize(requestContext.getUriInfo().getPath(), requestContext.getMethod(), token, authType);
     }
 
-    protected Optional<String> getToken(ContainerRequestContext requestContext) {
+    public Optional<String> getToken(ContainerRequestContext requestContext) {
+        // if cookies auth enabled for request url.. read cookies instead of Authorization header.
+        if (configHolder.getConfig().isCookiesEnabled()) return getTokenFromCookie(requestContext);
+
         final String header = requestContext.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
         log.debug("Authorization Header: {}", header);
         if (header != null) {
@@ -57,6 +62,32 @@ public abstract class AuthFilter implements ContainerRequestFilter {
             return Optional.of(rawToken);
         }
         return Optional.empty();
+    }
+
+    private Optional<String> getTokenFromCookie(ContainerRequestContext requestContext) {
+        try{
+            PrimerCookie config = getCookieConfig(requestContext);
+            if (null != config) {
+                Cookie cookie = requestContext.getCookies().get(config.getAuthCookie());
+                if (null != cookie) {
+                    final String encryptedToken = cookie.getValue();
+                    String token = AesUtils.decrypt(config.getEncryptionKey(), encryptedToken);
+                    log.debug("authorization jwt from cookie: {}", token);
+                    return Optional.ofNullable(token);
+                }
+            }
+        } catch (Exception e){
+            log.error("Error while reading token from cookie: {}", e.getMessage());
+        }
+        return Optional.empty();
+    }
+
+    private PrimerCookie getCookieConfig(ContainerRequestContext requestContext) {
+        final String[] splitPath = requestContext.getUriInfo().getPath().split("/");
+        if (splitPath.length < 2) {
+            return null;
+        }
+        return configHolder.getConfig().getCookiesConfigs().get(splitPath[1]);
     }
 
 
