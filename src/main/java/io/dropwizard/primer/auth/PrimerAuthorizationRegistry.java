@@ -43,6 +43,7 @@ import java.util.regex.Pattern;
  * @author phaneesh
  */
 @Slf4j
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class PrimerAuthorizationRegistry {
 
     private static Map<String, PrimerAuthorization> authList;
