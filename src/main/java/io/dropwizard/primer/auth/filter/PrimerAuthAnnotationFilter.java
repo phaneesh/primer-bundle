@@ -67,6 +67,8 @@ public class PrimerAuthAnnotationFilter extends AuthFilter {
 
         Optional<String> token = getToken(requestContext);
         if (!token.isPresent()) {
+            if (!isEnabled() || isWhitelisted())
+                return;
             requestContext.abortWith(
                     Response.status(configHolder.getConfig().getAbsentTokenStatus())
                             .entity(objectMapper.writeValueAsBytes(PrimerError.builder().errorCode("PR000").message("Bad request")
@@ -76,7 +78,6 @@ public class PrimerAuthAnnotationFilter extends AuthFilter {
             try {
                 final String decryptedToken = CryptUtil.tokenDecrypt(token.get(), secretKeySpec, ivParameterSpec);
                 JsonWebToken webToken = authorize(requestContext, decryptedToken, this.authType);
-
                 //Stamp authorization headers for downstream services which can
                 // use this to stop token forgery & misuse
                 stampHeaders(requestContext, webToken);
