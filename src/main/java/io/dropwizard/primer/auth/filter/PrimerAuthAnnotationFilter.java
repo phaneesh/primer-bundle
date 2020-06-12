@@ -65,6 +65,9 @@ public class PrimerAuthAnnotationFilter extends AuthFilter {
     @Metered(name = "authorize")
     public void filter(ContainerRequestContext requestContext) throws IOException {
 
+        if (!isEnabled())
+            return;
+
         Optional<String> token = getToken(requestContext);
         if (!token.isPresent()) {
             if (!isEnabled() || isWhitelisted())
@@ -83,7 +86,7 @@ public class PrimerAuthAnnotationFilter extends AuthFilter {
                 stampHeaders(requestContext, webToken);
 
                 // Do not proceed further with Auth if its disabled or whitelisted
-                if (!isEnabled() || isWhitelisted())
+                if (isWhitelisted())
                     return;
                 // Execute authorizer
                 if (authorizer != null)
