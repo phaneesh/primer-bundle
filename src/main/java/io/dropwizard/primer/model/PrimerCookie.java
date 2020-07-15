@@ -4,7 +4,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.validator.constraints.NotEmpty;
+
+import java.util.Map;
 
 /**
  * @author Sudhir
@@ -14,8 +15,8 @@ import org.hibernate.validator.constraints.NotEmpty;
 @AllArgsConstructor
 @Builder
 public class PrimerCookie {
-    @NotEmpty
-    String authCookie;
-    @NotEmpty
-    String encryptionKey;
+
+    String defaultAuthCookie;
+
+    Map<String, String> namespaceAuthCookies;
 }

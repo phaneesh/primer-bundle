@@ -29,6 +29,7 @@ import io.dropwizard.jetty.MutableServletContextHandler;
 import io.dropwizard.lifecycle.setup.LifecycleEnvironment;
 import io.dropwizard.primer.auth.authorizer.PrimerAnnotationAuthorizer;
 import io.dropwizard.primer.auth.authorizer.PrimerRoleAuthorizer;
+import io.dropwizard.primer.auth.token.PrimerTokenProvider;
 import io.dropwizard.primer.model.PrimerAuthorization;
 import io.dropwizard.primer.model.PrimerAuthorizationMatrix;
 import io.dropwizard.primer.model.PrimerBundleConfiguration;
@@ -91,6 +92,11 @@ public abstract class BaseTest {
         @Override
         public String getPrimerConfigAttribute() {
             return "primer";
+        }
+
+        @Override
+        public PrimerTokenProvider getPrimerTokenProvider() {
+            return PrimerTokenProvider.builder().build();
         }
     };
 

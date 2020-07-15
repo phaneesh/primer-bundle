@@ -9,6 +9,7 @@ import io.dropwizard.primer.auth.AuthType;
 import io.dropwizard.primer.auth.annotation.AuthWhitelist;
 import io.dropwizard.primer.auth.annotation.Authorize;
 import io.dropwizard.primer.auth.authorizer.PrimerAnnotationAuthorizer;
+import io.dropwizard.primer.auth.token.PrimerTokenProvider;
 import io.dropwizard.primer.auth.whitelist.AuthWhitelistValidator;
 import io.dropwizard.primer.core.PrimerError;
 import io.dropwizard.primer.exception.PrimerException;
@@ -53,9 +54,10 @@ public class PrimerAuthAnnotationFilter extends AuthFilter {
 
     @Builder
     public PrimerAuthAnnotationFilter(final PrimerConfigurationHolder configHolder, final ObjectMapper objectMapper,
-                                      final PrimerAnnotationAuthorizer authorizer,final SecretKeySpec secretKeySpec,
-                                        final GCMParameterSpec ivParameterSpec) {
-        super(AuthType.ANNOTATION, configHolder, objectMapper);
+                                      final PrimerAnnotationAuthorizer authorizer, final SecretKeySpec secretKeySpec,
+                                      final GCMParameterSpec ivParameterSpec,
+                                      final PrimerTokenProvider primerTokenProvider) {
+        super(AuthType.ANNOTATION, configHolder, objectMapper, primerTokenProvider);
         this.authorizer = authorizer;
         this.secretKeySpec = secretKeySpec;
         this.ivParameterSpec = ivParameterSpec;

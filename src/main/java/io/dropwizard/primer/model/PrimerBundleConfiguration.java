@@ -47,6 +47,6 @@ public class PrimerBundleConfiguration {
 
     private boolean cookiesEnabled;
 
-    private Map<String, PrimerCookie> cookiesConfigs = new HashMap<>();  // {service_name, service_cookie_config}
+    private PrimerCookie primerCookie;
 
 }

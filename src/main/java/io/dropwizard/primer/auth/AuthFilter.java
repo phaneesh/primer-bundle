@@ -6,22 +6,17 @@ import com.github.toastshaman.dropwizard.auth.jwt.exceptions.InvalidSignatureExc
 import com.github.toastshaman.dropwizard.auth.jwt.exceptions.MalformedJsonWebTokenException;
 import com.github.toastshaman.dropwizard.auth.jwt.exceptions.TokenExpiredException;
 import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
-import com.google.common.base.Strings;
 import feign.FeignException;
+import io.dropwizard.primer.auth.token.PrimerTokenProvider;
 import io.dropwizard.primer.core.PrimerError;
 import io.dropwizard.primer.exception.PrimerException;
 import io.dropwizard.primer.model.PrimerConfigurationHolder;
-import io.dropwizard.primer.model.PrimerCookie;
-import io.dropwizard.primer.util.AesUtils;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
-import javax.ws.rs.core.Cookie;
-import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import java.util.Optional;
-import java.util.concurrent.ExecutionException;
 
 /**
  * Created by pavan.kumar on 2019-02-19
@@ -32,16 +27,19 @@ public abstract class AuthFilter implements ContainerRequestFilter {
     protected final AuthType authType;
     protected final PrimerConfigurationHolder configHolder;
     protected final ObjectMapper objectMapper;
+    protected final PrimerTokenProvider primerTokenProvider;
 
     private static final String AUTHORIZED_FOR_ID = "X-AUTHORIZED-FOR-ID";
     private static final String AUTHORIZED_FOR_SUBJECT = "X-AUTHORIZED-FOR-SUBJECT";
     private static final String AUTHORIZED_FOR_NAME = "X-AUTHORIZED-FOR-NAME";
     private static final String AUTHORIZED_FOR_ROLE = "X-AUTHORIZED-FOR-ROLE";
 
-    protected AuthFilter(AuthType authType, PrimerConfigurationHolder configHolder, ObjectMapper objectMapper) {
+    protected AuthFilter(AuthType authType, PrimerConfigurationHolder configHolder, ObjectMapper objectMapper,
+                         PrimerTokenProvider primerTokenProvider) {
         this.authType = authType;
         this.configHolder = configHolder;
         this.objectMapper = objectMapper;
+        this.primerTokenProvider = primerTokenProvider;
     }
 
     protected JsonWebToken authorize(ContainerRequestContext requestContext, String token, AuthType authType) {
@@ -49,47 +47,8 @@ public abstract class AuthFilter implements ContainerRequestFilter {
     }
 
     public Optional<String> getToken(ContainerRequestContext requestContext) {
-        // if cookies auth enabled for request url.. read cookies instead of Authorization header.
-        if (configHolder.getConfig().isCookiesEnabled()) return getTokenFromCookie(requestContext);
-
-        final String header = requestContext.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-        log.debug("Authorization Header: {}", header);
-        if (header != null) {
-            final String rawToken = header.replaceAll(configHolder.getConfig().getPrefix(), "").trim();
-            if (Strings.isNullOrEmpty(rawToken)) {
-                return Optional.empty();
-            }
-            return Optional.of(rawToken);
-        }
-        return Optional.empty();
+        return primerTokenProvider.getToken(requestContext, configHolder);
     }
-
-    private Optional<String> getTokenFromCookie(ContainerRequestContext requestContext) {
-        try{
-            PrimerCookie config = getCookieConfig(requestContext);
-            if (null != config) {
-                Cookie cookie = requestContext.getCookies().get(config.getAuthCookie());
-                if (null != cookie) {
-                    final String encryptedToken = cookie.getValue();
-                    String token = AesUtils.decrypt(config.getEncryptionKey(), encryptedToken);
-                    log.debug("authorization jwt from cookie: {}", token);
-                    return Optional.ofNullable(token);
-                }
-            }
-        } catch (Exception e){
-            log.error("Error while reading token from cookie: {}", e.getMessage());
-        }
-        return Optional.empty();
-    }
-
-    private PrimerCookie getCookieConfig(ContainerRequestContext requestContext) {
-        final String[] splitPath = requestContext.getUriInfo().getPath().split("/");
-        if (splitPath.length < 2) {
-            return null;
-        }
-        return configHolder.getConfig().getCookiesConfigs().get(splitPath[1]);
-    }
-
 
     protected void stampHeaders(ContainerRequestContext requestContext, JsonWebToken webToken) {
         final String tokenType = (String) webToken.claim().getParameter("type");

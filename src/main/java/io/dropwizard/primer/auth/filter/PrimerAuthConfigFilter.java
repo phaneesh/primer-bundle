@@ -23,6 +23,7 @@ import com.google.common.util.concurrent.UncheckedExecutionException;
 import io.dropwizard.primer.auth.AuthFilter;
 import io.dropwizard.primer.auth.AuthType;
 import io.dropwizard.primer.auth.PrimerAuthorizationRegistry;
+import io.dropwizard.primer.auth.token.PrimerTokenProvider;
 import io.dropwizard.primer.core.PrimerError;
 import io.dropwizard.primer.exception.PrimerException;
 import io.dropwizard.primer.util.CryptUtil;
@@ -58,8 +59,9 @@ public class PrimerAuthConfigFilter extends AuthFilter {
 
   @Builder
   public PrimerAuthConfigFilter(final PrimerConfigurationHolder configHolder, final ObjectMapper objectMapper,
-                                final SecretKeySpec secretKeySpec, final GCMParameterSpec ivParameterSpec) {
-    super(AuthType.CONFIG, configHolder, objectMapper);
+                                final SecretKeySpec secretKeySpec, final GCMParameterSpec ivParameterSpec,
+                                final PrimerTokenProvider primerTokenProvider) {
+    super(AuthType.CONFIG, configHolder, objectMapper, primerTokenProvider);
     this.secretKeySpec = secretKeySpec;
     this.ivParameterSpec = ivParameterSpec;
   }
