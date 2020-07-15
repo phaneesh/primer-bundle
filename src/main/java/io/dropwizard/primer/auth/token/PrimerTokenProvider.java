@@ -2,6 +2,7 @@ package io.dropwizard.primer.auth.token;
 
 import com.google.common.base.Strings;
 import io.dropwizard.primer.model.PrimerConfigurationHolder;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,7 +19,10 @@ import java.util.Optional;
 @Slf4j
 @Builder
 @NoArgsConstructor
+@AllArgsConstructor
 public class PrimerTokenProvider {
+
+    String cookie;
 
     /**
      * Read token from cookies
@@ -28,12 +32,11 @@ public class PrimerTokenProvider {
      */
     protected Optional<String> fetchTokenFromCookies(ContainerRequestContext requestContext,
                                                    PrimerConfigurationHolder configHolder){
-        // if cookies are not allowed to be used
+        // if cookies auth is not allowed
         if (!configHolder.getConfig().isCookiesEnabled()) return Optional.empty();
 
-        String cookieName = configHolder.getConfig().getPrimerCookie().getDefaultAuthCookie();
-        if (Objects.nonNull(cookieName)) {
-            Cookie cookie = requestContext.getCookies().get(cookieName);
+        if (Objects.nonNull(this.cookie)) {
+            Cookie cookie = requestContext.getCookies().get(this.cookie);
             if (Objects.nonNull(cookie)) {
                 final String cookieValue = cookie.getValue();
                 return Optional.ofNullable(cookieValue);
