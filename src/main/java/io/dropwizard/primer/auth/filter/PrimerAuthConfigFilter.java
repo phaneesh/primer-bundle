@@ -18,7 +18,9 @@ package io.dropwizard.primer.auth.filter;
 
 import com.codahale.metrics.annotation.Metered;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.toastshaman.dropwizard.auth.jwt.JsonWebTokenParser;
 import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
+import com.github.toastshaman.dropwizard.auth.jwt.parser.DefaultJsonWebTokenParser;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import io.dropwizard.primer.auth.AuthFilter;
 import io.dropwizard.primer.auth.AuthType;
@@ -57,6 +59,8 @@ public class PrimerAuthConfigFilter extends AuthFilter {
 
   private final GCMParameterSpec ivParameterSpec;
 
+  private static final JsonWebTokenParser parser = new DefaultJsonWebTokenParser();;
+
   @Builder
   public PrimerAuthConfigFilter(final PrimerConfigurationHolder configHolder, final ObjectMapper objectMapper,
                                 final SecretKeySpec secretKeySpec, final GCMParameterSpec ivParameterSpec,
@@ -70,11 +74,14 @@ public class PrimerAuthConfigFilter extends AuthFilter {
   @Metered(name = "primer")
   public void filter(ContainerRequestContext requestContext) throws IOException {
     // Do not proceed further with Auth if its disabled or whitelisted
-    if (!isEnabled() || isWhitelisted(requestContext))
+    if (!isEnabled())
       return;
 
     Optional<String> token = getToken(requestContext);
     if (!token.isPresent()) {
+      if(isWhitelisted(requestContext)){
+        return;
+      }
       requestContext.abortWith(
           Response.status(configHolder.getConfig().getAbsentTokenStatus())
               .entity(objectMapper.writeValueAsBytes(PrimerError.builder().errorCode("PR000").message("Bad request")
@@ -83,7 +90,12 @@ public class PrimerAuthConfigFilter extends AuthFilter {
     } else {
       try {
         final String decryptedToken = CryptUtil.tokenDecrypt(token.get(), secretKeySpec, ivParameterSpec);
-        JsonWebToken webToken = authorize(requestContext, decryptedToken, this.authType);
+        JsonWebToken webToken;
+        if(isWhitelisted(requestContext)){
+          webToken = parser.parse(decryptedToken);
+        }else {
+          webToken = authorize(requestContext, decryptedToken, this.authType);
+        }
         //Stamp authorization headers for downstream services which can
         // use this to stop token forgery & misuse
         stampHeaders(requestContext, webToken);
