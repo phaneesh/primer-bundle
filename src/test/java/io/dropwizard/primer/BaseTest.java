@@ -96,7 +96,7 @@ public abstract class BaseTest {
         }
 
         @Override
-        public PrimerTokenProvider getPrimerTokenProvider() {
+        public PrimerTokenProvider getPrimerTokenProvider(Configuration configuration) {
             return PrimerTokenProvider.builder().primerCookie(primerCookie).build();
         }
     };

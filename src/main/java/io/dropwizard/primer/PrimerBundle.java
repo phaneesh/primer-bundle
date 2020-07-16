@@ -94,7 +94,7 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
 
   public abstract String getPrimerConfigAttribute();
 
-  public abstract PrimerTokenProvider getPrimerTokenProvider();
+  public abstract PrimerTokenProvider getPrimerTokenProvider(T configuration);
 
   public static PrimerClient getPrimerClient() {
     return primerClient;
@@ -217,7 +217,7 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
         .configHolder(configHolder)
         .objectMapper(environment.getObjectMapper())
         .secretKeySpec(secretKeySpec)
-        .primerTokenProvider(getPrimerTokenProvider())
+        .primerTokenProvider(getPrimerTokenProvider(configuration))
         .ivParameterSpec(ivParameterSpec)
         .build());
 
@@ -226,7 +226,7 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
         .objectMapper(environment.getObjectMapper())
         .authorizer(authorizer())
         .secretKeySpec(secretKeySpec)
-        .primerTokenProvider(getPrimerTokenProvider())
+        .primerTokenProvider(getPrimerTokenProvider(configuration))
         .ivParameterSpec(ivParameterSpec)
         .build());
   }

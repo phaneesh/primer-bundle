@@ -37,7 +37,7 @@ public class PrimerCookieTest extends BaseTest {
         PrimerConfigurationHolder configurationHolder = new PrimerConfigurationHolder(primerBundleConfiguration);
         // filter with default token provider with primer bundle
         authFilterWithDefaultProvider = new PrimerAuthConfigFilter(configurationHolder, mapper, null, null,
-                bundle.getPrimerTokenProvider());
+                bundle.getPrimerTokenProvider(configuration));
         // filter with custom token provider
         authFilterWithCustomTokenProvider = new PrimerAuthConfigFilter(configurationHolder, mapper, null, null,
                 TestUtils.getCustomTokenProvider(primerCookie, ImmutableMap.of("oculus","OCULUS_G_TOKEN", "scp", "SCP_G_TOKEN")));
