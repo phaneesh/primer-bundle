@@ -38,7 +38,7 @@ class TestUtils {
             // if cookies are not allowed to be used
             if (!configHolder.getConfig().isCookiesEnabled()) return Optional.empty();
 
-            String primerCookie = configHolder.getConfig().getCookie();
+            String primerCookie = this.primerCookie;
             String namespace = null;
             final String[] splitPath = requestContext.getUriInfo().getPath().split("/");
             if (splitPath.length >= 2) {

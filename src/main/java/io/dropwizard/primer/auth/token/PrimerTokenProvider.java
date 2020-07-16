@@ -22,7 +22,8 @@ import java.util.Optional;
 @AllArgsConstructor
 public class PrimerTokenProvider {
 
-    String cookie;
+    // default cookie name for primer auth
+    protected String primerCookie = "P_SESSIONID";
 
     /**
      * Read token from cookies
@@ -35,8 +36,8 @@ public class PrimerTokenProvider {
         // if cookies auth is not allowed
         if (!configHolder.getConfig().isCookiesEnabled()) return Optional.empty();
 
-        if (Objects.nonNull(this.cookie)) {
-            Cookie cookie = requestContext.getCookies().get(this.cookie);
+        if (Objects.nonNull(this.primerCookie)) {
+            Cookie cookie = requestContext.getCookies().get(this.primerCookie);
             if (Objects.nonNull(cookie)) {
                 final String cookieValue = cookie.getValue();
                 return Optional.ofNullable(cookieValue);
@@ -75,7 +76,7 @@ public class PrimerTokenProvider {
                                      PrimerConfigurationHolder configHolder) {
         Optional<String> header = fetchTokenFromHeader(requestContext, configHolder);
         if (!header.isPresent())
-            // if Authorization header is not present read from cookie
+            // if Authorization header is not present read from primerCookie
             header = fetchTokenFromCookies(requestContext, configHolder);
         return header;
     }

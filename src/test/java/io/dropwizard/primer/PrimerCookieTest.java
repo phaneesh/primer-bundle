@@ -46,7 +46,7 @@ public class PrimerCookieTest extends BaseTest {
     /**
      * Token fetch success
      * Default provider 
-     * Pick token from primer cookie[default cookie] 
+     * Pick token from primer cookie[default cookie]
      */
     @Test
     public void testForValidCookie() {
@@ -58,7 +58,7 @@ public class PrimerCookieTest extends BaseTest {
     /**
      * Fail to fetch token 
      * Default provider 
-     * Pick token from primer cookie[default cookie] 
+     * Pick token from primer cookie[default cookie]
      */
     @Test
     public void testForInValidCookie() {
