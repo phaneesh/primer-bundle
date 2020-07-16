@@ -56,7 +56,7 @@ public abstract class BaseTest {
     protected static final Environment environment = mock(Environment.class);
     protected final Bootstrap<?> bootstrap = mock(Bootstrap.class);
     protected final Configuration configuration = mock(Configuration.class);
-    protected final String primerCookie = "PRIMER_AUTH";
+    protected final String primerCookie = "P_SESSIONID";
 
     protected static final ObjectMapper mapper = new ObjectMapper();
 
@@ -97,7 +97,7 @@ public abstract class BaseTest {
 
         @Override
         public PrimerTokenProvider getPrimerTokenProvider() {
-            return PrimerTokenProvider.builder().cookie(primerCookie).build();
+            return PrimerTokenProvider.builder().primerCookie(primerCookie).build();
         }
     };
 
