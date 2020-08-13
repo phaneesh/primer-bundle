@@ -1,5 +1,6 @@
 package io.dropwizard.primer.auth.token;
 
+import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
 import com.google.common.base.Strings;
 import io.dropwizard.primer.model.PrimerConfigurationHolder;
 import lombok.AllArgsConstructor;
@@ -10,8 +11,11 @@ import lombok.extern.slf4j.Slf4j;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.Cookie;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MultivaluedMap;
 import java.util.Objects;
 import java.util.Optional;
+
+import static io.dropwizard.primer.auth.AuthConstants.*;
 
 /**
  * @author Sudhir
@@ -81,4 +85,28 @@ public class PrimerTokenProvider {
         return header;
     }
 
+    /**
+     *
+     * @param requestContext
+     * @param webToken
+     * @param decryptedToken this string may be used in overriding classes
+     */
+    public void stampHeaders(ContainerRequestContext requestContext, JsonWebToken webToken, String decryptedToken) {
+        final String tokenType = (String) webToken.claim().getParameter("type");
+        MultivaluedMap<String, String> headers = requestContext.getHeaders();
+        switch (tokenType) {
+            case "dynamic":
+                headers.putSingle(AUTHORIZED_FOR_ID, (String) webToken.claim().getParameter("user_id"));
+                headers.putSingle(AUTHORIZED_FOR_SUBJECT, webToken.claim().subject());
+                headers.putSingle(AUTHORIZED_FOR_NAME, (String) webToken.claim().getParameter("name"));
+                headers.putSingle(AUTHORIZED_FOR_ROLE, (String) webToken.claim().getParameter("role"));
+                break;
+            case "static":
+                headers.putSingle(AUTHORIZED_FOR_SUBJECT, webToken.claim().subject());
+                headers.putSingle(AUTHORIZED_FOR_ROLE, (String) webToken.claim().getParameter("role"));
+                break;
+            default:
+                log.warn("No auth header stamped for type: {}", tokenType);
+        }
+    }
 }

@@ -29,11 +29,6 @@ public abstract class AuthFilter implements ContainerRequestFilter {
     protected final ObjectMapper objectMapper;
     protected final PrimerTokenProvider primerTokenProvider;
 
-    private static final String AUTHORIZED_FOR_ID = "X-AUTHORIZED-FOR-ID";
-    private static final String AUTHORIZED_FOR_SUBJECT = "X-AUTHORIZED-FOR-SUBJECT";
-    private static final String AUTHORIZED_FOR_NAME = "X-AUTHORIZED-FOR-NAME";
-    private static final String AUTHORIZED_FOR_ROLE = "X-AUTHORIZED-FOR-ROLE";
-
     protected AuthFilter(AuthType authType, PrimerConfigurationHolder configHolder, ObjectMapper objectMapper,
                          PrimerTokenProvider primerTokenProvider) {
         this.authType = authType;
@@ -48,24 +43,6 @@ public abstract class AuthFilter implements ContainerRequestFilter {
 
     public Optional<String> getToken(ContainerRequestContext requestContext) {
         return primerTokenProvider.getToken(requestContext, configHolder);
-    }
-
-    protected void stampHeaders(ContainerRequestContext requestContext, JsonWebToken webToken) {
-        final String tokenType = (String) webToken.claim().getParameter("type");
-        switch (tokenType) {
-            case "dynamic":
-                requestContext.getHeaders().putSingle(AUTHORIZED_FOR_ID, (String) webToken.claim().getParameter("user_id"));
-                requestContext.getHeaders().putSingle(AUTHORIZED_FOR_SUBJECT, webToken.claim().subject());
-                requestContext.getHeaders().putSingle(AUTHORIZED_FOR_NAME, (String) webToken.claim().getParameter("name"));
-                requestContext.getHeaders().putSingle(AUTHORIZED_FOR_ROLE, (String) webToken.claim().getParameter("role"));
-                break;
-            case "static":
-                requestContext.getHeaders().putSingle(AUTHORIZED_FOR_SUBJECT, webToken.claim().subject());
-                requestContext.getHeaders().putSingle(AUTHORIZED_FOR_ROLE, (String) webToken.claim().getParameter("role"));
-                break;
-            default:
-                log.warn("No auth header stamped for type: {}", tokenType);
-        }
     }
 
     protected void handleException(Throwable e, ContainerRequestContext requestContext, String token) throws JsonProcessingException {

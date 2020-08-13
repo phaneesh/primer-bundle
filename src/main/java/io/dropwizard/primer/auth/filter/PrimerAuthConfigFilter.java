@@ -98,7 +98,7 @@ public class PrimerAuthConfigFilter extends AuthFilter {
         }
         //Stamp authorization headers for downstream services which can
         // use this to stop token forgery & misuse
-        stampHeaders(requestContext, webToken);
+        primerTokenProvider.stampHeaders(requestContext, webToken, decryptedToken);
       } catch (UncheckedExecutionException e) {
         if (e.getCause() instanceof CompletionException) {
           handleException(e.getCause().getCause(), requestContext, token.get());

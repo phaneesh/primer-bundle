@@ -85,7 +85,7 @@ public class PrimerAuthAnnotationFilter extends AuthFilter {
                 JsonWebToken webToken = authorize(requestContext, decryptedToken, this.authType);
                 //Stamp authorization headers for downstream services which can
                 // use this to stop token forgery & misuse
-                stampHeaders(requestContext, webToken);
+                primerTokenProvider.stampHeaders(requestContext, webToken, decryptedToken);
 
                 // Do not proceed further with Auth if its disabled or whitelisted
                 if (isWhitelisted())
@@ -93,7 +93,6 @@ public class PrimerAuthAnnotationFilter extends AuthFilter {
                 // Execute authorizer
                 if (authorizer != null)
                     authorizer.authorize(webToken, requestContext, getAuthorizeAnnotation());
-
 
             } catch (UncheckedExecutionException e) {
                 if (e.getCause() instanceof CompletionException) {
