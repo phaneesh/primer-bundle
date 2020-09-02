@@ -43,4 +43,9 @@ public class PrimerBundleConfiguration {
     private Set<String> whileListUrl = new HashSet<>();
 
     private PrimerAuthorizationMatrix authorizations;
+
+    private boolean cookiesEnabled;
+
+    private String cookie;
+
 }

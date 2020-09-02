@@ -33,6 +33,7 @@ import io.dropwizard.ConfiguredBundle;
 import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.primer.auth.PrimerAuthorizationRegistry;
 import io.dropwizard.primer.auth.authorizer.PrimerAnnotationAuthorizer;
+import io.dropwizard.primer.auth.token.PrimerTokenProvider;
 import io.dropwizard.primer.auth.filter.PrimerAuthAnnotationFilter;
 import io.dropwizard.primer.auth.filter.PrimerAuthConfigFilter;
 import io.dropwizard.primer.client.PrimerClient;
@@ -92,6 +93,8 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
   public abstract PrimerAnnotationAuthorizer authorizer();
 
   public abstract String getPrimerConfigAttribute();
+
+  public abstract PrimerTokenProvider getPrimerTokenProvider(T configuration);
 
   public static PrimerClient getPrimerClient() {
     return primerClient;
@@ -214,6 +217,7 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
         .configHolder(configHolder)
         .objectMapper(environment.getObjectMapper())
         .secretKeySpec(secretKeySpec)
+        .primerTokenProvider(getPrimerTokenProvider(configuration))
         .ivParameterSpec(ivParameterSpec)
         .build());
 
@@ -222,6 +226,7 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
         .objectMapper(environment.getObjectMapper())
         .authorizer(authorizer())
         .secretKeySpec(secretKeySpec)
+        .primerTokenProvider(getPrimerTokenProvider(configuration))
         .ivParameterSpec(ivParameterSpec)
         .build());
   }

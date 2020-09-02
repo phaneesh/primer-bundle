@@ -29,6 +29,7 @@ import io.dropwizard.jetty.MutableServletContextHandler;
 import io.dropwizard.lifecycle.setup.LifecycleEnvironment;
 import io.dropwizard.primer.auth.authorizer.PrimerAnnotationAuthorizer;
 import io.dropwizard.primer.auth.authorizer.PrimerRoleAuthorizer;
+import io.dropwizard.primer.auth.token.PrimerTokenProvider;
 import io.dropwizard.primer.model.PrimerAuthorization;
 import io.dropwizard.primer.model.PrimerAuthorizationMatrix;
 import io.dropwizard.primer.model.PrimerBundleConfiguration;
@@ -55,6 +56,7 @@ public abstract class BaseTest {
     protected static final Environment environment = mock(Environment.class);
     protected final Bootstrap<?> bootstrap = mock(Bootstrap.class);
     protected final Configuration configuration = mock(Configuration.class);
+    protected final String primerCookie = "P_SESSIONID";
 
     protected static final ObjectMapper mapper = new ObjectMapper();
 
@@ -91,6 +93,11 @@ public abstract class BaseTest {
         @Override
         public String getPrimerConfigAttribute() {
             return "primer";
+        }
+
+        @Override
+        public PrimerTokenProvider getPrimerTokenProvider(Configuration configuration) {
+            return PrimerTokenProvider.builder().primerCookie(primerCookie).build();
         }
     };
 

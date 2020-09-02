@@ -6,20 +6,17 @@ import com.github.toastshaman.dropwizard.auth.jwt.exceptions.InvalidSignatureExc
 import com.github.toastshaman.dropwizard.auth.jwt.exceptions.MalformedJsonWebTokenException;
 import com.github.toastshaman.dropwizard.auth.jwt.exceptions.TokenExpiredException;
 import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
-import com.google.common.base.Strings;
 import feign.FeignException;
+import io.dropwizard.primer.auth.token.PrimerTokenProvider;
 import io.dropwizard.primer.core.PrimerError;
 import io.dropwizard.primer.exception.PrimerException;
-import io.dropwizard.primer.model.PrimerBundleConfiguration;
 import io.dropwizard.primer.model.PrimerConfigurationHolder;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
-import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import java.util.Optional;
-import java.util.concurrent.ExecutionException;
 
 /**
  * Created by pavan.kumar on 2019-02-19
@@ -30,52 +27,22 @@ public abstract class AuthFilter implements ContainerRequestFilter {
     protected final AuthType authType;
     protected final PrimerConfigurationHolder configHolder;
     protected final ObjectMapper objectMapper;
+    protected final PrimerTokenProvider primerTokenProvider;
 
-    private static final String AUTHORIZED_FOR_ID = "X-AUTHORIZED-FOR-ID";
-    private static final String AUTHORIZED_FOR_SUBJECT = "X-AUTHORIZED-FOR-SUBJECT";
-    private static final String AUTHORIZED_FOR_NAME = "X-AUTHORIZED-FOR-NAME";
-    private static final String AUTHORIZED_FOR_ROLE = "X-AUTHORIZED-FOR-ROLE";
-
-    protected AuthFilter(AuthType authType, PrimerConfigurationHolder configHolder, ObjectMapper objectMapper) {
+    protected AuthFilter(AuthType authType, PrimerConfigurationHolder configHolder, ObjectMapper objectMapper,
+                         PrimerTokenProvider primerTokenProvider) {
         this.authType = authType;
         this.configHolder = configHolder;
         this.objectMapper = objectMapper;
+        this.primerTokenProvider = primerTokenProvider;
     }
 
-    protected JsonWebToken authorize(ContainerRequestContext requestContext, String token, AuthType authType) throws ExecutionException {
+    protected JsonWebToken authorize(ContainerRequestContext requestContext, String token, AuthType authType) {
         return PrimerAuthorizationRegistry.authorize(requestContext.getUriInfo().getPath(), requestContext.getMethod(), token, authType);
     }
 
-    protected Optional<String> getToken(ContainerRequestContext requestContext) {
-        final String header = requestContext.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-        log.debug("Authorization Header: {}", header);
-        if (header != null) {
-            final String rawToken = header.replaceAll(configHolder.getConfig().getPrefix(), "").trim();
-            if (Strings.isNullOrEmpty(rawToken)) {
-                return Optional.empty();
-            }
-            return Optional.of(rawToken);
-        }
-        return Optional.empty();
-    }
-
-
-    protected void stampHeaders(ContainerRequestContext requestContext, JsonWebToken webToken) {
-        final String tokenType = (String) webToken.claim().getParameter("type");
-        switch (tokenType) {
-            case "dynamic":
-                requestContext.getHeaders().putSingle(AUTHORIZED_FOR_ID, (String) webToken.claim().getParameter("user_id"));
-                requestContext.getHeaders().putSingle(AUTHORIZED_FOR_SUBJECT, webToken.claim().subject());
-                requestContext.getHeaders().putSingle(AUTHORIZED_FOR_NAME, (String) webToken.claim().getParameter("name"));
-                requestContext.getHeaders().putSingle(AUTHORIZED_FOR_ROLE, (String) webToken.claim().getParameter("role"));
-                break;
-            case "static":
-                requestContext.getHeaders().putSingle(AUTHORIZED_FOR_SUBJECT, webToken.claim().subject());
-                requestContext.getHeaders().putSingle(AUTHORIZED_FOR_ROLE, (String) webToken.claim().getParameter("role"));
-                break;
-            default:
-                log.warn("No auth header stamped for type: {}", tokenType);
-        }
+    public Optional<String> getToken(ContainerRequestContext requestContext) {
+        return primerTokenProvider.getToken(requestContext, configHolder);
     }
 
     protected void handleException(Throwable e, ContainerRequestContext requestContext, String token) throws JsonProcessingException {
