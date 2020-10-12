@@ -52,7 +52,7 @@
         <feign.ranger.version>0.1.6</feign.ranger.version>
         <caffeine.version>2.6.2</caffeine.version>
         <slf4j.version>1.7.13</slf4j.version>
-        <junit.version>4.12</junit.version>
+        <junit.version>4.13.1</junit.version>
         <wiremock.version>1.58</wiremock.version>
         <mockito.version>2.13.0</mockito.version>
         <maven.compiler.source>1.8</maven.compiler.source>
