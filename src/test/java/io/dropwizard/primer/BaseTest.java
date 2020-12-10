@@ -16,6 +16,7 @@
 
 package io.dropwizard.primer;
 
+import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.health.HealthCheckRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.toastshaman.dropwizard.auth.jwt.hmac.HmacSHA512Signer;
@@ -52,7 +53,7 @@ public abstract class BaseTest {
 
     protected final HealthCheckRegistry healthChecks = mock(HealthCheckRegistry.class);
     protected final JerseyEnvironment jerseyEnvironment = mock(JerseyEnvironment.class);
-    protected final LifecycleEnvironment lifecycleEnvironment = new LifecycleEnvironment();
+    protected final LifecycleEnvironment lifecycleEnvironment = new LifecycleEnvironment(mock(MetricRegistry.class));
     protected static final Environment environment = mock(Environment.class);
     protected final Bootstrap<?> bootstrap = mock(Bootstrap.class);
     protected final Configuration configuration = mock(Configuration.class);
