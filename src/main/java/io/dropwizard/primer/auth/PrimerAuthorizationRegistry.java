@@ -18,10 +18,6 @@ package io.dropwizard.primer.auth;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
-import com.github.toastshaman.dropwizard.auth.jwt.JsonWebTokenParser;
-import com.github.toastshaman.dropwizard.auth.jwt.hmac.HmacSHA512Verifier;
-import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
-import com.github.toastshaman.dropwizard.auth.jwt.validator.ExpiryValidator;
 import com.google.common.base.Strings;
 import io.dropwizard.primer.PrimerBundle;
 import io.dropwizard.primer.core.ServiceUser;
@@ -33,8 +29,15 @@ import io.dropwizard.primer.model.PrimerAuthorizationMatrix;
 import io.dropwizard.primer.model.PrimerBundleConfiguration;
 import lombok.*;
 import lombok.extern.slf4j.Slf4j;
-import org.joda.time.Duration;
+import org.jose4j.jwa.AlgorithmConstraints;
+import org.jose4j.jws.AlgorithmIdentifiers;
+import org.jose4j.jwt.JwtClaims;
+import org.jose4j.jwt.MalformedClaimException;
+import org.jose4j.jwt.consumer.InvalidJwtException;
+import org.jose4j.jwt.consumer.JwtConsumer;
+import org.jose4j.jwt.consumer.JwtConsumerBuilder;
 
+import java.security.Key;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
@@ -54,17 +57,13 @@ public class PrimerAuthorizationRegistry {
 
     private static LoadingCache<String, Optional<Boolean>> blacklistCache;
 
-    private static LoadingCache<TokenKey, JsonWebToken> lruCache;
+    private static LoadingCache<TokenKey, JwtClaims> lruCache;
 
-    private static JsonWebTokenParser parser;
-    private static HmacSHA512Verifier verifier;
-    private static ExpiryValidator expiryValidator;
+    private static JwtConsumer verificationJwtConsumer;
 
     public static void init(PrimerAuthorizationMatrix matrix,
                             Set<String> whiteListUrls, PrimerBundleConfiguration configuration,
-                            JsonWebTokenParser tokenParser, HmacSHA512Verifier tokenVerifier) {
-        parser = tokenParser;
-        verifier = tokenVerifier;
+                            Key hmacKey) {
 
         val tokenMatch = Pattern.compile("\\{(([^/])+\\})");
 
@@ -100,7 +99,7 @@ public class PrimerAuthorizationRegistry {
         PrimerAuthorizationRegistry.whiteList = primerWhitelistedUrls(whiteListUrls, tokenMatch);
         PrimerAuthorizationRegistry.urlPatterns = urlPatterns;
 
-        expiryValidator = new ExpiryValidator(new Duration(configuration.getClockSkew()));
+        verificationJwtConsumer = getVerificationJwtConsumer(hmacKey, configuration.getClockSkew());
         blacklistCache = Caffeine.newBuilder()
                 .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
                 .maximumSize(configuration.getCacheMaxSize())
@@ -109,6 +108,18 @@ public class PrimerAuthorizationRegistry {
                 .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
                 .maximumSize(configuration.getCacheMaxSize())
                 .build(PrimerAuthorizationRegistry::verifyToken);
+    }
+
+    private static JwtConsumer getVerificationJwtConsumer(Key key, int secondsOfAllowedClockSkew) {
+        return new JwtConsumerBuilder()
+                .setRequireExpirationTime()
+                .setAllowedClockSkewInSeconds(secondsOfAllowedClockSkew)
+                .setRequireSubject()
+                .setSkipDefaultAudienceValidation()
+                .setVerificationKey(key)
+                .setJwsAlgorithmConstraints(
+                        AlgorithmConstraints.ConstraintType.PERMIT, AlgorithmIdentifiers.HMAC_SHA512)
+                .build();
     }
 
     private static List<String> primerWhitelistedUrls(Set<String> whiteListUrls, Pattern tokenMatch) {
@@ -124,7 +135,7 @@ public class PrimerAuthorizationRegistry {
         return path.replaceAll("\\{(([^/])+\\})", "(([^/])+)");
     }
 
-    public static JsonWebToken authorize(final String path, final String method, final String token, final AuthType authType) {
+    public static JwtClaims authorize(final String path, final String method, final String token, final AuthType authType) {
         return lruCache.get(TokenKey.builder()
                 .method(method)
                 .path(path)
@@ -142,12 +153,12 @@ public class PrimerAuthorizationRegistry {
         return authList.get(id).getRoles().contains(role) && authList.get(id).getMethods().contains(method);
     }
 
-    private static JsonWebToken verify(JsonWebToken webToken, String token, String type) throws PrimerException {
+    private static JwtClaims verify(JwtClaims jwtClaims, String token, String type) throws PrimerException, MalformedClaimException {
         switch (type) {
             case "dynamic":
-                return verifyDynamic(webToken, token);
+                return verifyDynamic(jwtClaims, token);
             case "static":
-                return verifyStatic(webToken, token);
+                return verifyStatic(jwtClaims, token);
         }
         log.debug("invalid_token_type type:{} token:{}", type, token);
         throw PrimerException.builder()
@@ -157,15 +168,15 @@ public class PrimerAuthorizationRegistry {
                 .build();
     }
 
-    private static JsonWebToken verifyDynamic(JsonWebToken webToken, String token) throws PrimerException {
+    private static JwtClaims verifyDynamic(JwtClaims jwtClaims, String token) throws PrimerException, MalformedClaimException {
         final VerifyResponse verifyResponse = PrimerBundle.getPrimerClient().verify(
-                webToken.claim().issuer(),
-                webToken.claim().subject(),
+                jwtClaims.getIssuer(),
+                jwtClaims.getSubject(),
                 token,
                 ServiceUser.builder()
-                        .id((String) webToken.claim().getParameter("user_id"))
-                        .name((String) webToken.claim().getParameter("name"))
-                        .role((String) webToken.claim().getParameter("role"))
+                        .id(jwtClaims.getClaimValueAsString("user_id"))
+                        .name(jwtClaims.getClaimValueAsString("name"))
+                        .role(jwtClaims.getClaimValueAsString("role"))
                         .build()
         );
         val result = (!Strings.isNullOrEmpty(verifyResponse.getToken()) && !Strings.isNullOrEmpty(verifyResponse.getUserId()));
@@ -178,12 +189,15 @@ public class PrimerAuthorizationRegistry {
                     .status(401)
                     .build();
         }
-        return webToken;
+        return jwtClaims;
     }
 
-    private static JsonWebToken verifyStatic(JsonWebToken webToken, String token) throws PrimerException {
-        final VerifyStaticResponse verifyStaticResponse = PrimerBundle.getPrimerClient().verify(webToken.claim().issuer(),
-                webToken.claim().subject(), token, (String) webToken.claim().getParameter("role"));
+    private static JwtClaims verifyStatic(JwtClaims jwtClaims, String token) throws PrimerException, MalformedClaimException {
+        final VerifyStaticResponse verifyStaticResponse = PrimerBundle.getPrimerClient().verify(
+                jwtClaims.getIssuer(),
+                jwtClaims.getSubject(),
+                token,
+                jwtClaims.getClaimValueAsString("role"));
         val result = (!Strings.isNullOrEmpty(verifyStaticResponse.getToken()) && !Strings.isNullOrEmpty(verifyStaticResponse.getId()));
         if (!result) {
             log.debug("dynamic_token_validation_failed token:{} verify_response:{}", token, verifyStaticResponse);
@@ -194,14 +208,13 @@ public class PrimerAuthorizationRegistry {
                     .status(401)
                     .build();
         }
-        return webToken;
+        return jwtClaims;
     }
 
-    private static JsonWebToken verifyConfigAuthToken(TokenKey tokenKey) throws PrimerException {
-        final JsonWebToken webToken = parser.parse(tokenKey.getToken());
-        verifier.verifySignature(webToken);
-        expiryValidator.validate(webToken);
-        final String role = (String) webToken.claim().getParameter("role");
+    private static JwtClaims verifyConfigAuthToken(TokenKey tokenKey)
+            throws PrimerException, InvalidJwtException, MalformedClaimException {
+        JwtClaims jwtClaims = verificationJwtConsumer.processToClaims(tokenKey.getToken());
+        final String role = jwtClaims.getClaimValueAsString("role");
         val index = urlPatterns.stream().filter(tokenKey.getPath()::matches).findFirst();
         if (!index.isPresent()) {
             log.debug("No index found for {}", tokenKey);
@@ -223,12 +236,12 @@ public class PrimerAuthorizationRegistry {
         }
         switch (authList.get(index.get()).getType()) {
             case "dynamic":
-                return verify(webToken, tokenKey.getToken(), "dynamic");
+                return verify(jwtClaims, tokenKey.getToken(), "dynamic");
             case "static":
-                return verify(webToken, tokenKey.getToken(), "static");
+                return verify(jwtClaims, tokenKey.getToken(), "static");
             case "auto":
-                final String type = (String) webToken.claim().getParameter("type");
-                return verify(webToken, tokenKey.getToken(), type);
+                final String type = jwtClaims.getClaimValueAsString("type");
+                return verify(jwtClaims, tokenKey.getToken(), type);
             default:
                 log.debug("invalid_token_type for index:{} token:{}",
                         authList.get(index.get()).getType(), tokenKey);
@@ -240,16 +253,16 @@ public class PrimerAuthorizationRegistry {
         }
     }
 
-    private static JsonWebToken verifyAnnotationAuthToken(TokenKey tokenKey) throws PrimerException {
-        final JsonWebToken webToken = parser.parse(tokenKey.getToken());
-        verifier.verifySignature(webToken);
-        expiryValidator.validate(webToken);
+    private static JwtClaims verifyAnnotationAuthToken(TokenKey tokenKey)
+            throws PrimerException, InvalidJwtException, MalformedClaimException {
+        JwtClaims jwtClaims = verificationJwtConsumer.processToClaims(tokenKey.getToken());
 
-        final String type = (String) webToken.claim().getParameter("type");
-        return verify(webToken, tokenKey.getToken(), type);
+        final String type = jwtClaims.getClaimValueAsString("type");
+        return verify(jwtClaims, tokenKey.getToken(), type);
     }
 
-    private static JsonWebToken verifyToken(TokenKey tokenKey) throws PrimerException {
+    private static JwtClaims verifyToken(TokenKey tokenKey)
+            throws PrimerException, InvalidJwtException, MalformedClaimException {
         switch (tokenKey.getAuthType()) {
             case CONFIG:
                 return verifyConfigAuthToken(tokenKey);

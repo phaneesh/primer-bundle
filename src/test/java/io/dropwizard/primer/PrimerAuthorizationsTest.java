@@ -17,21 +17,22 @@
 package io.dropwizard.primer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
-import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebTokenClaim;
-import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebTokenHeader;
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
 import io.dropwizard.primer.auth.AuthType;
 import io.dropwizard.primer.auth.PrimerAuthorizationRegistry;
 import io.dropwizard.primer.core.VerifyResponse;
 import io.dropwizard.primer.exception.PrimerException;
-import org.joda.time.DateTime;
+import org.jose4j.jwt.NumericDate;
+import org.jose4j.lang.JoseException;
 import org.junit.Rule;
 import org.junit.Test;
 
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.junit.Assert.*;
@@ -133,24 +134,15 @@ public class PrimerAuthorizationsTest extends BaseTest {
         }
     }
 
-    private String buildTokenWithInvalidRole() {
-        JsonWebToken jwt = JsonWebToken.builder()
-                .header(
-                        JsonWebTokenHeader.HS512()
-                )
-                .claim(JsonWebTokenClaim
-                        .builder()
-                        .expiration(DateTime.now().plusYears(1))
-                        .subject("test")
-                        .issuer("test")
-                        .issuedAt(DateTime.now())
-                        .param("user_id", "test")
-                        .param("role", "test_invalid")
-                        .param("name", "test")
-                        .param("type", "dynamic")
-                        .build())
-                .build();
-        return hmacSHA512Signer.sign(jwt);
+    private String buildTokenWithInvalidRole() throws JoseException {
+        Map<String, Object> claimsMap = new HashMap<>();
+        claimsMap.put("user_id" , "test");
+        claimsMap.put("role" , "test_invalid");
+        claimsMap.put("name", "test");
+        claimsMap.put("type", "dynamic");
+        NumericDate expiryDate = NumericDate.now();
+        expiryDate.addSeconds(TimeUnit.SECONDS.convert(365, TimeUnit.DAYS));
+        return generate(primerBundleConfiguration.getPrivateKey(), "test", "test", claimsMap, expiryDate);
     }
 
     private boolean validateException(Throwable e) {

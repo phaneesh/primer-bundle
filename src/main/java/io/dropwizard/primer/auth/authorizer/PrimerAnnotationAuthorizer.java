@@ -1,12 +1,12 @@
 package io.dropwizard.primer.auth.authorizer;
 
-import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
 import io.dropwizard.primer.auth.annotation.Authorize;
 import io.dropwizard.primer.exception.PrimerException;
+import org.jose4j.jwt.JwtClaims;
 
 import javax.ws.rs.container.ContainerRequestContext;
 
 public interface PrimerAnnotationAuthorizer {
 
-    void authorize(JsonWebToken jwt, ContainerRequestContext containerRequestContext, Authorize authorize) throws PrimerException;
+    void authorize(JwtClaims jwtClaims, ContainerRequestContext containerRequestContext, Authorize authorize) throws PrimerException;
 }

@@ -16,9 +16,6 @@
 package io.dropwizard.primer;
 
 import com.fasterxml.jackson.databind.jsontype.NamedType;
-import com.github.toastshaman.dropwizard.auth.jwt.JsonWebTokenParser;
-import com.github.toastshaman.dropwizard.auth.jwt.hmac.HmacSHA512Verifier;
-import com.github.toastshaman.dropwizard.auth.jwt.parser.DefaultJsonWebTokenParser;
 import com.google.common.hash.Hashing;
 import feign.Feign;
 import feign.Logger;
@@ -63,6 +60,7 @@ import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.protocol.HTTP;
+import org.jose4j.keys.HmacKey;
 
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -253,11 +251,7 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
   }
 
   public void initializeAuthorization(T configuration) {
-    final JsonWebTokenParser tokenParser = new DefaultJsonWebTokenParser();
     PrimerBundleConfiguration primerConfig = configHolder.getConfig();
-
-    final byte[] secretKey = primerConfig.getPrivateKey().getBytes(StandardCharsets.UTF_8);
-    final HmacSHA512Verifier tokenVerifier = new HmacSHA512Verifier(secretKey);
 
     final Set<String> whiteListUrls = new HashSet<>();
     final Set<String> dynamicWhiteList = withWhiteList(configuration);
@@ -289,7 +283,10 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
         permissionMatrix.getStaticAuthorizations().addAll(dynamicAuthMatrix.getStaticAuthorizations());
       }
     }
-    PrimerAuthorizationRegistry.init(permissionMatrix, whiteListUrls, primerConfig, tokenParser, tokenVerifier);
+
+    final byte[] secretKey = primerConfig.getPrivateKey().getBytes(StandardCharsets.UTF_8);
+    HmacKey hmacKey = new HmacKey(secretKey);
+    PrimerAuthorizationRegistry.init(permissionMatrix, whiteListUrls, primerConfig, hmacKey);
   }
 
 }

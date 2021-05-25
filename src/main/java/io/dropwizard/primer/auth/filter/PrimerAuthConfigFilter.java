@@ -18,9 +18,6 @@ package io.dropwizard.primer.auth.filter;
 
 import com.codahale.metrics.annotation.Metered;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.github.toastshaman.dropwizard.auth.jwt.JsonWebTokenParser;
-import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
-import com.github.toastshaman.dropwizard.auth.jwt.parser.DefaultJsonWebTokenParser;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import io.dropwizard.primer.auth.AuthFilter;
 import io.dropwizard.primer.auth.AuthType;
@@ -32,6 +29,9 @@ import io.dropwizard.primer.util.CryptUtil;
 import io.dropwizard.primer.model.PrimerConfigurationHolder;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
+import org.jose4j.jwt.JwtClaims;
+import org.jose4j.jwt.consumer.JwtConsumer;
+import org.jose4j.jwt.consumer.JwtConsumerBuilder;
 
 import javax.annotation.Priority;
 import javax.crypto.spec.GCMParameterSpec;
@@ -59,7 +59,7 @@ public class PrimerAuthConfigFilter extends AuthFilter {
 
   private final GCMParameterSpec ivParameterSpec;
 
-  private static final JsonWebTokenParser parser = new DefaultJsonWebTokenParser();;
+  private final JwtConsumer validationsSkippedJwtConsumer;
 
   @Builder
   public PrimerAuthConfigFilter(final PrimerConfigurationHolder configHolder, final ObjectMapper objectMapper,
@@ -68,6 +68,10 @@ public class PrimerAuthConfigFilter extends AuthFilter {
     super(AuthType.CONFIG, configHolder, objectMapper, primerTokenProvider);
     this.secretKeySpec = secretKeySpec;
     this.ivParameterSpec = ivParameterSpec;
+    validationsSkippedJwtConsumer = new JwtConsumerBuilder()
+            .setSkipSignatureVerification()
+            .setSkipAllDefaultValidators()
+            .build();
   }
 
   @Override
@@ -90,15 +94,15 @@ public class PrimerAuthConfigFilter extends AuthFilter {
     } else {
       try {
         final String decryptedToken = CryptUtil.tokenDecrypt(token.get(), secretKeySpec, ivParameterSpec);
-        JsonWebToken webToken;
-        if(isWhitelisted(requestContext)){
-          webToken = parser.parse(decryptedToken);
-        }else {
-          webToken = authorize(requestContext, decryptedToken, this.authType);
+        JwtClaims jwtClaims;
+        if(isWhitelisted(requestContext)) {
+          jwtClaims = validationsSkippedJwtConsumer.processToClaims(decryptedToken);
+        } else {
+          jwtClaims = authorize(requestContext, decryptedToken, this.authType);
         }
         //Stamp authorization headers for downstream services which can
         // use this to stop token forgery & misuse
-        primerTokenProvider.stampHeaders(requestContext, webToken, decryptedToken);
+        primerTokenProvider.stampHeaders(requestContext, jwtClaims, decryptedToken);
       } catch (UncheckedExecutionException e) {
         if (e.getCause() instanceof CompletionException) {
           handleException(e.getCause().getCause(), requestContext, token.get());

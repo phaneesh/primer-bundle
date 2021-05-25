@@ -2,16 +2,15 @@ package io.dropwizard.primer.auth;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.github.toastshaman.dropwizard.auth.jwt.exceptions.InvalidSignatureException;
-import com.github.toastshaman.dropwizard.auth.jwt.exceptions.MalformedJsonWebTokenException;
-import com.github.toastshaman.dropwizard.auth.jwt.exceptions.TokenExpiredException;
-import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
 import feign.FeignException;
 import io.dropwizard.primer.auth.token.PrimerTokenProvider;
 import io.dropwizard.primer.core.PrimerError;
 import io.dropwizard.primer.exception.PrimerException;
 import io.dropwizard.primer.model.PrimerConfigurationHolder;
 import lombok.extern.slf4j.Slf4j;
+import org.jose4j.jwt.JwtClaims;
+import org.jose4j.jwt.consumer.ErrorCodes;
+import org.jose4j.jwt.consumer.InvalidJwtException;
 
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
@@ -37,7 +36,7 @@ public abstract class AuthFilter implements ContainerRequestFilter {
         this.primerTokenProvider = primerTokenProvider;
     }
 
-    protected JsonWebToken authorize(ContainerRequestContext requestContext, String token, AuthType authType) {
+    protected JwtClaims authorize(ContainerRequestContext requestContext, String token, AuthType authType) {
         return PrimerAuthorizationRegistry.authorize(requestContext.getUriInfo().getPath(), requestContext.getMethod(), token, authType);
     }
 
@@ -46,27 +45,30 @@ public abstract class AuthFilter implements ContainerRequestFilter {
     }
 
     protected void handleException(Throwable e, ContainerRequestContext requestContext, String token) throws JsonProcessingException {
-        if (e.getCause() instanceof TokenExpiredException || e instanceof TokenExpiredException) {
-            log.error("Token Expiry Error: {}", e.getMessage());
-            abortRequest(
-                    requestContext,
-                    Response.Status.PRECONDITION_FAILED,
-                    PrimerError.builder().errorCode("PR003").message("Expired").build()
-            );
-        } else if (e.getCause() instanceof MalformedJsonWebTokenException || e instanceof MalformedJsonWebTokenException) {
-            log.error("Token Malformed Error: {}", e.getMessage());
-            abortRequest(
-                    requestContext,
-                    Response.Status.UNAUTHORIZED,
-                    PrimerError.builder().errorCode("PR004").message("Unauthorized").build()
-            );
-        } else if (e.getCause() instanceof InvalidSignatureException || e instanceof InvalidSignatureException) {
-            log.error("Token Signature Error: {}", e.getMessage());
-            abortRequest(
-                    requestContext,
-                    Response.Status.UNAUTHORIZED,
-                    PrimerError.builder().errorCode("PR004").message("Unauthorized").build()
-            );
+        if (e.getCause() instanceof InvalidJwtException || e instanceof InvalidJwtException) {
+            InvalidJwtException invalidJwtException = (InvalidJwtException) e;
+            if (invalidJwtException.hasExpired()) {
+                log.error("Token Expiry Error: {}", e.getMessage());
+                abortRequest(
+                        requestContext,
+                        Response.Status.PRECONDITION_FAILED,
+                        PrimerError.builder().errorCode("PR003").message("Expired").build()
+                );
+            } else if (invalidJwtException.hasErrorCode(ErrorCodes.SIGNATURE_INVALID)) {
+                log.error("Token Signature Error: {}", e.getMessage());
+                abortRequest(
+                        requestContext,
+                        Response.Status.UNAUTHORIZED,
+                        PrimerError.builder().errorCode("PR004").message("Unauthorized").build()
+                );
+            } else {
+                log.error("Token Malformed Error: {}", e.getMessage());
+                abortRequest(
+                        requestContext,
+                        Response.Status.UNAUTHORIZED,
+                        PrimerError.builder().errorCode("PR004").message("Unauthorized").build()
+                );
+            }
         } else if (e.getCause() instanceof FeignException) {
             log.error("Feign error: {}", e.getMessage());
             handleError(Response.Status.fromStatusCode(((FeignException) e.getCause()).status()), "PR000", e.getCause().getMessage(), token, false,
