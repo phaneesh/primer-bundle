@@ -48,4 +48,6 @@ public class PrimerBundleConfiguration {
 
     private String cookie;
 
+    private int jwkPublicKeyCacheMaxSize;
+
 }

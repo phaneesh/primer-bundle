@@ -34,7 +34,12 @@ import io.dropwizard.primer.model.PrimerSimpleEndpoint;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 
+import java.security.Key;
+import java.security.interfaces.RSAPrivateKey;
 import java.util.Collections;
+
+import org.jose4j.jwk.RsaJsonWebKey;
+import org.jose4j.jwk.RsaJwkGenerator;
 import org.jose4j.jws.AlgorithmIdentifiers;
 import org.jose4j.jws.JsonWebSignature;
 import org.jose4j.jwt.JwtClaims;
@@ -110,7 +115,10 @@ public abstract class BaseTest {
 
     protected PrimerBundleConfiguration primerBundleConfiguration;
 
-    public String token = null;
+    public String hmacToken = null;
+    public String rsaToken = null;
+    public String rsaJwkKeyId = "key1";
+    RsaJsonWebKey rsaJsonWebKey;
 
     protected static BundleTestResource bundleTestResource = new BundleTestResource();
 
@@ -145,7 +153,12 @@ public abstract class BaseTest {
         claimsMap.put("type", "dynamic");
         NumericDate expiryDate = NumericDate.now();
         expiryDate.addSeconds(TimeUnit.SECONDS.convert(365, TimeUnit.DAYS));
-        token = generate(primerBundleConfiguration.getPrivateKey(), "test", "test", claimsMap, expiryDate);
+        HmacKey hmacKey = new HmacKey(primerBundleConfiguration.getPrivateKey().getBytes());
+        hmacToken = generate(hmacKey, "test", "test", claimsMap, expiryDate);
+
+        rsaJsonWebKey = RsaJwkGenerator.generateJwk(2048);
+        rsaJsonWebKey.setKeyId(rsaJwkKeyId);
+        rsaToken = generate(rsaJsonWebKey.getRsaPrivateKey(), "test", "test", claimsMap, expiryDate);
 
         lifecycleEnvironment.getManagedObjects().forEach(object -> {
             try {
@@ -158,8 +171,8 @@ public abstract class BaseTest {
         environment.jersey().register(bundleTestResource);
     }
 
-    public String generate(final String privateKey, final String subject, final String issuer,
-                            final Map<String, Object> claimsMap, final NumericDate expiryTime)
+    public String generate(final Key key, final String subject, final String issuer,
+                           final Map<String, Object> claimsMap, final NumericDate expiryTime)
             throws JoseException {
         JwtClaims claims = new JwtClaims();
         claims.setSubject(subject);
@@ -175,12 +188,15 @@ public abstract class BaseTest {
         // The payload of the JWS is JSON content of the JWT Claims
         jws.setPayload(claims.toJson());
 
-        HmacKey hmacKey = new HmacKey(privateKey.getBytes());
         // The JWT is signed using the private key
-        jws.setKey(hmacKey);
+        jws.setKey(key);
 
         jws.setHeader(HeaderParameterNames.TYPE, "JWT");
-        jws.setAlgorithmHeaderValue(AlgorithmIdentifiers.HMAC_SHA512);
+        if (key instanceof HmacKey) {
+            jws.setAlgorithmHeaderValue(AlgorithmIdentifiers.HMAC_SHA512);
+        } else if (key instanceof RSAPrivateKey) {
+            jws.setAlgorithmHeaderValue(AlgorithmIdentifiers.RSA_USING_SHA512);
+        }
 
         return jws.getCompactSerialization();
     }

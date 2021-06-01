@@ -2,6 +2,7 @@ package io.dropwizard.primer.auth;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Strings;
 import feign.FeignException;
 import io.dropwizard.primer.auth.token.PrimerTokenProvider;
 import io.dropwizard.primer.core.PrimerError;
@@ -23,6 +24,8 @@ import java.util.Optional;
 @Slf4j
 public abstract class AuthFilter implements ContainerRequestFilter {
 
+    protected static final String PRIMER_KEY_ID = "P_KEY_ID";
+
     protected final AuthType authType;
     protected final PrimerConfigurationHolder configHolder;
     protected final ObjectMapper objectMapper;
@@ -37,7 +40,9 @@ public abstract class AuthFilter implements ContainerRequestFilter {
     }
 
     protected JwtClaims authorize(ContainerRequestContext requestContext, String token, AuthType authType) {
-        return PrimerAuthorizationRegistry.authorize(requestContext.getUriInfo().getPath(), requestContext.getMethod(), token, authType);
+        String primerKeyId = getKeyId(requestContext);
+        return PrimerAuthorizationRegistry.authorize(requestContext.getUriInfo().getPath(), requestContext.getMethod(),
+                token, authType, primerKeyId);
     }
 
     public Optional<String> getToken(ContainerRequestContext requestContext) {
@@ -129,5 +134,9 @@ public abstract class AuthFilter implements ContainerRequestFilter {
                         .entity(objectMapper.writeValueAsBytes(primerError))
                         .build()
         );
+    }
+
+    private String getKeyId(ContainerRequestContext requestContext) {
+        return requestContext.getHeaders().getFirst(PRIMER_KEY_ID);
     }
 }

@@ -68,7 +68,7 @@ public class PrimerAuthConfigFilter extends AuthFilter {
     super(AuthType.CONFIG, configHolder, objectMapper, primerTokenProvider);
     this.secretKeySpec = secretKeySpec;
     this.ivParameterSpec = ivParameterSpec;
-    validationsSkippedJwtConsumer = new JwtConsumerBuilder()
+    this.validationsSkippedJwtConsumer = new JwtConsumerBuilder()
             .setSkipSignatureVerification()
             .setSkipAllDefaultValidators()
             .build();

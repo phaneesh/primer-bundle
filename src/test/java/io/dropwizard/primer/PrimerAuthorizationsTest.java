@@ -22,7 +22,9 @@ import io.dropwizard.primer.auth.AuthType;
 import io.dropwizard.primer.auth.PrimerAuthorizationRegistry;
 import io.dropwizard.primer.core.VerifyResponse;
 import io.dropwizard.primer.exception.PrimerException;
+import org.jose4j.jwk.JsonWebKey;
 import org.jose4j.jwt.NumericDate;
+import org.jose4j.keys.HmacKey;
 import org.jose4j.lang.JoseException;
 import org.junit.Rule;
 import org.junit.Test;
@@ -57,16 +59,25 @@ public class PrimerAuthorizationsTest extends BaseTest {
 
     @Test
     public void testAuthorizedCall() throws PrimerException, JsonProcessingException, ExecutionException {
-            stubFor(post(urlEqualTo("/v1/verify/test/test"))
-                    .willReturn(aResponse()
-                            .withStatus(200)
-                            .withHeader("Content-Type", "application/json")
-                            .withBody(mapper.writeValueAsBytes(VerifyResponse.builder()
-                                    .expiresAt(Instant.now().plusSeconds(10000).toEpochMilli())
-                                    .token(token)
-                                    .userId("test")
-                                    .build()))));
-        assertNotNull(PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", token, AuthType.CONFIG));
+        stubFor(post(urlEqualTo("/v1/verify/test/test"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(mapper.writeValueAsBytes(VerifyResponse.builder()
+                                .expiresAt(Instant.now().plusSeconds(10000).toEpochMilli())
+                                .token(hmacToken)
+                                .userId("test")
+                                .build()))));
+        assertNotNull(PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", hmacToken, AuthType.CONFIG, null));
+
+        stubFor(get(urlEqualTo("/v1/key/" + rsaJwkKeyId))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(mapper.writeValueAsBytes(
+                                rsaJsonWebKey.toJson(JsonWebKey.OutputControlLevel.PUBLIC_ONLY)
+                        ))));
+        assertNotNull(PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", hmacToken, AuthType.CONFIG, null));
     }
 
     @Test
@@ -77,16 +88,16 @@ public class PrimerAuthorizationsTest extends BaseTest {
                         .withHeader("Content-Type", "application/json")
                         .withBody(mapper.writeValueAsBytes(VerifyResponse.builder()
                                 .expiresAt(Instant.now().plusSeconds(10000).toEpochMilli())
-                                .token(token)
+                                .token(hmacToken)
                                 .userId("test")
                                 .build()))));
-        assertNotNull(PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", token, AuthType.ANNOTATION));
+        assertNotNull(PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", hmacToken, AuthType.ANNOTATION, null));
     }
 
     @Test
     public void testUnAuthorizedCallWithInvalidRole() {
         try {
-            PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", buildTokenWithInvalidRole(), AuthType.CONFIG);
+            PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", buildTokenWithInvalidRole(), AuthType.CONFIG, null);
             fail("Should have failed!!");
         } catch (Exception e) {
             assertTrue(validateException(e));
@@ -96,7 +107,7 @@ public class PrimerAuthorizationsTest extends BaseTest {
     @Test
     public void testAnnotatedUnAuthorizedCall() throws PrimerException, ExecutionException {
         try {
-            PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", token, AuthType.ANNOTATION);
+            PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", hmacToken, AuthType.ANNOTATION, null);
             fail("Should have failed!!");
         } catch (Exception e) {
             assertTrue(validateException(e));
@@ -106,7 +117,7 @@ public class PrimerAuthorizationsTest extends BaseTest {
     @Test
     public void testUnAuthorizedCallWithInvalidMethod() throws PrimerException, ExecutionException {
         try {
-        PrimerAuthorizationRegistry.authorize("simple/auth/test", "POST", token, AuthType.CONFIG);
+        PrimerAuthorizationRegistry.authorize("simple/auth/test", "POST", hmacToken, AuthType.CONFIG, null);
         fail("Should have failed!!");
     } catch (Exception e) {
         assertTrue(validateException(e));
@@ -117,7 +128,7 @@ public class PrimerAuthorizationsTest extends BaseTest {
     @Test
     public void testUnAuthorizedCallWithInvalidPath() throws PrimerException, ExecutionException {
         try {
-            PrimerAuthorizationRegistry.authorize("simple/auth/test/invalid", "GET", token, AuthType.CONFIG);
+            PrimerAuthorizationRegistry.authorize("simple/auth/test/invalid", "GET", hmacToken, AuthType.CONFIG, null);
             fail("Should have failed!!");
         } catch (Exception e) {
             assertTrue(validateException(e));
@@ -127,7 +138,7 @@ public class PrimerAuthorizationsTest extends BaseTest {
     @Test
     public void testUnAuthorizedCallWithInvalidRoleAndMethod() {
         try {
-            PrimerAuthorizationRegistry.authorize("simple/auth/test", "POST", buildTokenWithInvalidRole(), AuthType.CONFIG);
+            PrimerAuthorizationRegistry.authorize("simple/auth/test", "POST", buildTokenWithInvalidRole(), AuthType.CONFIG, null);
             fail("Should have failed!!");
         } catch (Exception e) {
             assertTrue(validateException(e));
@@ -142,7 +153,8 @@ public class PrimerAuthorizationsTest extends BaseTest {
         claimsMap.put("type", "dynamic");
         NumericDate expiryDate = NumericDate.now();
         expiryDate.addSeconds(TimeUnit.SECONDS.convert(365, TimeUnit.DAYS));
-        return generate(primerBundleConfiguration.getPrivateKey(), "test", "test", claimsMap, expiryDate);
+        HmacKey hmacKey = new HmacKey(primerBundleConfiguration.getPrivateKey().getBytes());
+        return generate(hmacKey, "test", "test", claimsMap, expiryDate);
     }
 
     private boolean validateException(Throwable e) {

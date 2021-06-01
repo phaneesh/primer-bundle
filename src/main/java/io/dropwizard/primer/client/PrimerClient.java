@@ -40,4 +40,8 @@ public interface PrimerClient {
     VerifyStaticResponse verify(@Param("app") final String app,
                                 @Param("id") final String id, @Param("token") final String token,
                                 @Param("role") final String role) throws PrimerException;
+
+    @RequestLine("GET /v1/key/{id}")
+    @Headers({"Content-Type: application/json"})
+    String getPublicKey(@Param("id") final String id) throws PrimerException;
 }

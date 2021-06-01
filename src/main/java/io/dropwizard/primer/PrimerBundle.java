@@ -30,6 +30,7 @@ import io.dropwizard.ConfiguredBundle;
 import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.primer.auth.PrimerAuthorizationRegistry;
 import io.dropwizard.primer.auth.authorizer.PrimerAnnotationAuthorizer;
+import io.dropwizard.primer.auth.orchestration.KeyOrchestrator;
 import io.dropwizard.primer.auth.token.PrimerTokenProvider;
 import io.dropwizard.primer.auth.filter.PrimerAuthAnnotationFilter;
 import io.dropwizard.primer.auth.filter.PrimerAuthConfigFilter;
@@ -284,9 +285,8 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
       }
     }
 
-    final byte[] secretKey = primerConfig.getPrivateKey().getBytes(StandardCharsets.UTF_8);
-    HmacKey hmacKey = new HmacKey(secretKey);
-    PrimerAuthorizationRegistry.init(permissionMatrix, whiteListUrls, primerConfig, hmacKey);
+    KeyOrchestrator keyOrchestrator = new KeyOrchestrator(primerConfig.getJwkPublicKeyCacheMaxSize());
+    PrimerAuthorizationRegistry.init(permissionMatrix, whiteListUrls, primerConfig, keyOrchestrator);
   }
 
 }

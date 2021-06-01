@@ -20,6 +20,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.google.common.base.Strings;
 import io.dropwizard.primer.PrimerBundle;
+import io.dropwizard.primer.auth.orchestration.KeyOrchestrator;
 import io.dropwizard.primer.core.ServiceUser;
 import io.dropwizard.primer.core.VerifyResponse;
 import io.dropwizard.primer.core.VerifyStaticResponse;
@@ -59,11 +60,14 @@ public class PrimerAuthorizationRegistry {
 
     private static LoadingCache<TokenKey, JwtClaims> lruCache;
 
-    private static JwtConsumer verificationJwtConsumer;
+    private static int clockSkew;
 
-    public static void init(PrimerAuthorizationMatrix matrix,
-                            Set<String> whiteListUrls, PrimerBundleConfiguration configuration,
-                            Key hmacKey) {
+    private static String hmacPrivateKey;
+
+    private static KeyOrchestrator keyOrchestrator;
+
+    public static void init(PrimerAuthorizationMatrix matrix, Set<String> whiteListUrls,
+                            PrimerBundleConfiguration configuration, KeyOrchestrator jwkKeyOrchestrator) {
 
         val tokenMatch = Pattern.compile("\\{(([^/])+\\})");
 
@@ -99,7 +103,6 @@ public class PrimerAuthorizationRegistry {
         PrimerAuthorizationRegistry.whiteList = primerWhitelistedUrls(whiteListUrls, tokenMatch);
         PrimerAuthorizationRegistry.urlPatterns = urlPatterns;
 
-        verificationJwtConsumer = getVerificationJwtConsumer(hmacKey, configuration.getClockSkew());
         blacklistCache = Caffeine.newBuilder()
                 .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
                 .maximumSize(configuration.getCacheMaxSize())
@@ -108,6 +111,10 @@ public class PrimerAuthorizationRegistry {
                 .expireAfterWrite(configuration.getCacheExpiry(), TimeUnit.SECONDS)
                 .maximumSize(configuration.getCacheMaxSize())
                 .build(PrimerAuthorizationRegistry::verifyToken);
+
+        clockSkew = configuration.getClockSkew();
+        hmacPrivateKey = configuration.getPrivateKey();
+        keyOrchestrator = jwkKeyOrchestrator;
     }
 
     private static JwtConsumer getVerificationJwtConsumer(Key key, int secondsOfAllowedClockSkew) {
@@ -118,7 +125,8 @@ public class PrimerAuthorizationRegistry {
                 .setSkipDefaultAudienceValidation()
                 .setVerificationKey(key)
                 .setJwsAlgorithmConstraints(
-                        AlgorithmConstraints.ConstraintType.PERMIT, AlgorithmIdentifiers.HMAC_SHA512)
+                        AlgorithmConstraints.ConstraintType.PERMIT,
+                        AlgorithmIdentifiers.HMAC_SHA512, AlgorithmIdentifiers.RSA_USING_SHA256)
                 .build();
     }
 
@@ -135,12 +143,14 @@ public class PrimerAuthorizationRegistry {
         return path.replaceAll("\\{(([^/])+\\})", "(([^/])+)");
     }
 
-    public static JwtClaims authorize(final String path, final String method, final String token, final AuthType authType) {
+    public static JwtClaims authorize(final String path, final String method, final String token, final AuthType authType,
+                                      final String primerKeyId) {
         return lruCache.get(TokenKey.builder()
                 .method(method)
                 .path(path)
                 .token(token)
                 .authType(authType)
+                .primerKeyId(primerKeyId)
                 .build());
     }
 
@@ -211,9 +221,8 @@ public class PrimerAuthorizationRegistry {
         return jwtClaims;
     }
 
-    private static JwtClaims verifyConfigAuthToken(TokenKey tokenKey)
-            throws PrimerException, InvalidJwtException, MalformedClaimException {
-        JwtClaims jwtClaims = verificationJwtConsumer.processToClaims(tokenKey.getToken());
+    private static JwtClaims verifyConfigAuthToken(TokenKey tokenKey, JwtClaims jwtClaims)
+            throws PrimerException, MalformedClaimException {
         final String role = jwtClaims.getClaimValueAsString("role");
         val index = urlPatterns.stream().filter(tokenKey.getPath()::matches).findFirst();
         if (!index.isPresent()) {
@@ -253,9 +262,8 @@ public class PrimerAuthorizationRegistry {
         }
     }
 
-    private static JwtClaims verifyAnnotationAuthToken(TokenKey tokenKey)
-            throws PrimerException, InvalidJwtException, MalformedClaimException {
-        JwtClaims jwtClaims = verificationJwtConsumer.processToClaims(tokenKey.getToken());
+    private static JwtClaims verifyAnnotationAuthToken(TokenKey tokenKey, JwtClaims jwtClaims)
+            throws PrimerException, MalformedClaimException {
 
         final String type = jwtClaims.getClaimValueAsString("type");
         return verify(jwtClaims, tokenKey.getToken(), type);
@@ -263,11 +271,14 @@ public class PrimerAuthorizationRegistry {
 
     private static JwtClaims verifyToken(TokenKey tokenKey)
             throws PrimerException, InvalidJwtException, MalformedClaimException {
+        Key key = keyOrchestrator.getPublicKey(hmacPrivateKey, tokenKey.getPrimerKeyId());
+        JwtConsumer verificationJwtConsumer = getVerificationJwtConsumer(key, clockSkew);
+        JwtClaims jwtClaims = verificationJwtConsumer.processToClaims(tokenKey.getToken());
         switch (tokenKey.getAuthType()) {
             case CONFIG:
-                return verifyConfigAuthToken(tokenKey);
+                return verifyConfigAuthToken(tokenKey, jwtClaims);
             case ANNOTATION:
-                return verifyAnnotationAuthToken(tokenKey);
+                return verifyAnnotationAuthToken(tokenKey, jwtClaims);
             default:
                 throw PrimerException.builder()
                         .errorCode("PR004")
@@ -296,6 +307,8 @@ public class PrimerAuthorizationRegistry {
         private String method;
 
         private AuthType authType;
+
+        private String primerKeyId;
     }
 
 }
