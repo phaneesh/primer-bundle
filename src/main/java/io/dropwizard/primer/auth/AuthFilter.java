@@ -2,7 +2,6 @@ package io.dropwizard.primer.auth;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.Strings;
 import feign.FeignException;
 import io.dropwizard.primer.auth.token.PrimerTokenProvider;
 import io.dropwizard.primer.core.PrimerError;
@@ -12,6 +11,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.jose4j.jwt.JwtClaims;
 import org.jose4j.jwt.consumer.ErrorCodes;
 import org.jose4j.jwt.consumer.InvalidJwtException;
+import org.jose4j.jwt.consumer.JwtConsumer;
+import org.jose4j.jwt.consumer.JwtConsumerBuilder;
 
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
@@ -24,12 +25,11 @@ import java.util.Optional;
 @Slf4j
 public abstract class AuthFilter implements ContainerRequestFilter {
 
-    protected static final String PRIMER_KEY_ID = "P_KEY_ID";
-
     protected final AuthType authType;
     protected final PrimerConfigurationHolder configHolder;
     protected final ObjectMapper objectMapper;
     protected final PrimerTokenProvider primerTokenProvider;
+    protected final JwtConsumer validationsSkippedJwtConsumer;
 
     protected AuthFilter(AuthType authType, PrimerConfigurationHolder configHolder, ObjectMapper objectMapper,
                          PrimerTokenProvider primerTokenProvider) {
@@ -37,10 +37,14 @@ public abstract class AuthFilter implements ContainerRequestFilter {
         this.configHolder = configHolder;
         this.objectMapper = objectMapper;
         this.primerTokenProvider = primerTokenProvider;
+        this.validationsSkippedJwtConsumer = new JwtConsumerBuilder()
+                .setSkipSignatureVerification()
+                .setSkipAllDefaultValidators()
+                .build();
     }
 
-    protected JwtClaims authorize(ContainerRequestContext requestContext, String token, AuthType authType) {
-        String primerKeyId = getKeyId(requestContext);
+    protected JwtClaims authorize(ContainerRequestContext requestContext, String token, AuthType authType) throws InvalidJwtException {
+        String primerKeyId = getKeyId(token);
         return PrimerAuthorizationRegistry.authorize(requestContext.getUriInfo().getPath(), requestContext.getMethod(),
                 token, authType, primerKeyId);
     }
@@ -136,7 +140,8 @@ public abstract class AuthFilter implements ContainerRequestFilter {
         );
     }
 
-    private String getKeyId(ContainerRequestContext requestContext) {
-        return requestContext.getHeaders().getFirst(PRIMER_KEY_ID);
+    private String getKeyId(String token) throws InvalidJwtException {
+        JwtClaims jwtClaims = validationsSkippedJwtConsumer.processToClaims(token);
+        return jwtClaims.getClaimValueAsString("key_id");
     }
 }

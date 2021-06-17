@@ -59,8 +59,6 @@ public class PrimerAuthConfigFilter extends AuthFilter {
 
   private final GCMParameterSpec ivParameterSpec;
 
-  private final JwtConsumer validationsSkippedJwtConsumer;
-
   @Builder
   public PrimerAuthConfigFilter(final PrimerConfigurationHolder configHolder, final ObjectMapper objectMapper,
                                 final SecretKeySpec secretKeySpec, final GCMParameterSpec ivParameterSpec,
@@ -68,10 +66,6 @@ public class PrimerAuthConfigFilter extends AuthFilter {
     super(AuthType.CONFIG, configHolder, objectMapper, primerTokenProvider);
     this.secretKeySpec = secretKeySpec;
     this.ivParameterSpec = ivParameterSpec;
-    this.validationsSkippedJwtConsumer = new JwtConsumerBuilder()
-            .setSkipSignatureVerification()
-            .setSkipAllDefaultValidators()
-            .build();
   }
 
   @Override
