@@ -16,6 +16,7 @@
 
 package io.dropwizard.primer.client;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import feign.Headers;
 import feign.Param;
 import feign.RequestLine;
@@ -43,5 +44,5 @@ public interface PrimerClient {
 
     @RequestLine("GET /v1/key/{id}")
     @Headers({"Content-Type: application/json"})
-    String getPublicKey(@Param("id") final String id) throws PrimerException;
+    JsonNode getPublicKey(@Param("id") final String id) throws PrimerException;
 }

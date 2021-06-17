@@ -15,6 +15,7 @@
  */
 package io.dropwizard.primer;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.jsontype.NamedType;
 import com.google.common.hash.Hashing;
 import feign.Feign;
@@ -128,7 +129,7 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
 
     configHolder = new PrimerConfigurationHolder(primerConfig);
 
-    initializeAuthorization(configuration);
+    initializeAuthorization(configuration, environment.getObjectMapper());
 
     final JacksonDecoder decoder = new JacksonDecoder();
     final JacksonEncoder encoder = new JacksonEncoder();
@@ -251,7 +252,7 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
     }
   }
 
-  public void initializeAuthorization(T configuration) {
+  public void initializeAuthorization(T configuration, ObjectMapper mapper) {
     PrimerBundleConfiguration primerConfig = configHolder.getConfig();
 
     final Set<String> whiteListUrls = new HashSet<>();
@@ -285,7 +286,7 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
       }
     }
 
-    KeyOrchestrator keyOrchestrator = new KeyOrchestrator(primerConfig.getJwkPublicKeyCacheMaxSize());
+    KeyOrchestrator keyOrchestrator = new KeyOrchestrator(primerConfig.getJwkPublicKeyCacheMaxSize(), mapper);
     PrimerAuthorizationRegistry.init(permissionMatrix, whiteListUrls, primerConfig, keyOrchestrator);
   }
 

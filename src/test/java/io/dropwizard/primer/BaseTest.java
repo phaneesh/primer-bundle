@@ -195,7 +195,7 @@ public abstract class BaseTest {
         if (key instanceof HmacKey) {
             jws.setAlgorithmHeaderValue(AlgorithmIdentifiers.HMAC_SHA512);
         } else if (key instanceof RSAPrivateKey) {
-            jws.setAlgorithmHeaderValue(AlgorithmIdentifiers.RSA_USING_SHA512);
+            jws.setAlgorithmHeaderValue(AlgorithmIdentifiers.RSA_USING_SHA256);
         }
 
         return jws.getCompactSerialization();

@@ -1,5 +1,8 @@
 package io.dropwizard.primer.auth.orchestration;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.google.common.base.Strings;
@@ -16,23 +19,27 @@ import org.jose4j.lang.JoseException;
 
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
+import java.util.Map;
 
 /***
  Created by mudit.g on May, 2021
  ***/
 public class KeyOrchestrator {
 
-    private static LoadingCache<String, RsaJsonWebKey> jwkPublicKeyLruCache;
+    private final LoadingCache<String, RsaJsonWebKey> jwkPublicKeyLruCache;
+    private final ObjectMapper mapper;
 
-    public KeyOrchestrator(final int jwkPublicKeyCacheMaxSize) {
-        jwkPublicKeyLruCache = Caffeine.newBuilder()
+    public KeyOrchestrator(final int jwkPublicKeyCacheMaxSize, final ObjectMapper objectMapper) {
+        this.jwkPublicKeyLruCache = Caffeine.newBuilder()
                 .maximumSize(jwkPublicKeyCacheMaxSize)
                 .build(this::getPublicJwkViaNetworkCall);
+        this.mapper = objectMapper;
     }
 
     private RsaJsonWebKey getPublicJwkViaNetworkCall(@NonNull String keyId) throws PrimerException, JoseException {
-        String jwkJson = PrimerBundle.getPrimerClient().getPublicKey(keyId);
-        return new RsaJsonWebKey(JsonUtil.parseJson(jwkJson));
+        JsonNode jwkJson = PrimerBundle.getPrimerClient().getPublicKey(keyId);
+        Map<String, Object> jwkMap = mapper.convertValue(jwkJson, new TypeReference<Map<String, Object>>(){});
+        return new RsaJsonWebKey(jwkMap);
     }
 
     private RsaJsonWebKey getPublicJwk(@NonNull String keyId) {
