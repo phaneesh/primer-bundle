@@ -26,6 +26,7 @@ import org.jose4j.jwk.JsonWebKey;
 import org.jose4j.jwt.NumericDate;
 import org.jose4j.keys.HmacKey;
 import org.jose4j.lang.JoseException;
+import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 
@@ -142,6 +143,30 @@ public class PrimerAuthorizationsTest extends BaseTest {
             fail("Should have failed!!");
         } catch (Exception e) {
             assertTrue(validateException(e));
+        }
+    }
+
+    @Test
+    public void testAuthorizedCallGetKeyFailed() throws PrimerException, JsonProcessingException, ExecutionException {
+        try {
+            stubFor(post(urlEqualTo("/v1/verify/test/test"))
+                    .willReturn(aResponse()
+                            .withStatus(200)
+                            .withHeader("Content-Type", "application/json")
+                            .withBody(mapper.writeValueAsBytes(VerifyResponse.builder()
+                                    .expiresAt(Instant.now().plusSeconds(10000).toEpochMilli())
+                                    .token(rsaToken)
+                                    .userId("test")
+                                    .build()))));
+
+            stubFor(get(urlEqualTo("/v1/key/" + rsaJwkKeyId))
+                    .willReturn(aResponse()
+                            .withStatus(500)
+                            .withHeader("Content-Type", "application/json")));
+            assertNotNull(PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", rsaToken, AuthType.CONFIG, rsaJwkKeyId));
+            fail("Should have failed!!");
+        } catch (CompletionException e) {
+            Assert.assertTrue(true);
         }
     }
 
