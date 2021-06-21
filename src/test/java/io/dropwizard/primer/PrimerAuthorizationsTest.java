@@ -75,9 +75,9 @@ public class PrimerAuthorizationsTest extends BaseTest {
                         .withStatus(200)
                         .withHeader("Content-Type", "application/json")
                         .withBody(mapper.writeValueAsBytes(
-                                rsaJsonWebKey.toJson(JsonWebKey.OutputControlLevel.PUBLIC_ONLY)
+                                mapper.readTree(rsaJsonWebKey.toJson(JsonWebKey.OutputControlLevel.PUBLIC_ONLY))
                         ))));
-        assertNotNull(PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", hmacToken, AuthType.CONFIG, null));
+        assertNotNull(PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", rsaToken, AuthType.CONFIG, rsaJwkKeyId));
     }
 
     @Test
