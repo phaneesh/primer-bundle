@@ -271,7 +271,7 @@ public class PrimerAuthorizationRegistry {
 
     private static JwtClaims verifyToken(TokenKey tokenKey)
             throws PrimerException, InvalidJwtException, MalformedClaimException {
-        Key key = keyOrchestrator.getPublicKey(hmacPrivateKey, tokenKey.getPrimerKeyId());
+        Key key = getPublicKey(tokenKey.getPrimerKeyId());
         JwtConsumer verificationJwtConsumer = getVerificationJwtConsumer(key, clockSkew);
         JwtClaims jwtClaims = verificationJwtConsumer.processToClaims(tokenKey.getToken());
         switch (tokenKey.getAuthType()) {
@@ -286,6 +286,13 @@ public class PrimerAuthorizationRegistry {
                         .status(401)
                         .build();
         }
+    }
+
+    private static Key getPublicKey(String rsaKeyId) {
+        if (Strings.isNullOrEmpty(rsaKeyId)) {
+            return keyOrchestrator.getHmacPublicKey(hmacPrivateKey);
+        }
+        return keyOrchestrator.getRsaPublicKey(rsaKeyId);
     }
 
     static void blacklist(String token) {
