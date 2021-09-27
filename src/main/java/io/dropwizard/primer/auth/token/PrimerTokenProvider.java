@@ -1,12 +1,13 @@
 package io.dropwizard.primer.auth.token;
 
-import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
 import com.google.common.base.Strings;
 import io.dropwizard.primer.model.PrimerConfigurationHolder;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jose4j.jwt.JwtClaims;
+import org.jose4j.jwt.MalformedClaimException;
 
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.Cookie;
@@ -88,22 +89,23 @@ public class PrimerTokenProvider {
     /**
      *
      * @param requestContext
-     * @param webToken
+     * @param jwtClaims
      * @param decryptedToken this string may be used in overriding classes
      */
-    public void stampHeaders(ContainerRequestContext requestContext, JsonWebToken webToken, String decryptedToken) {
-        final String tokenType = (String) webToken.claim().getParameter("type");
+    public void stampHeaders(ContainerRequestContext requestContext, JwtClaims jwtClaims, String decryptedToken)
+            throws MalformedClaimException {
+        final String tokenType = jwtClaims.getClaimValueAsString("type");
         MultivaluedMap<String, String> headers = requestContext.getHeaders();
         switch (tokenType) {
             case "dynamic":
-                headers.putSingle(AUTHORIZED_FOR_ID, (String) webToken.claim().getParameter("user_id"));
-                headers.putSingle(AUTHORIZED_FOR_SUBJECT, webToken.claim().subject());
-                headers.putSingle(AUTHORIZED_FOR_NAME, (String) webToken.claim().getParameter("name"));
-                headers.putSingle(AUTHORIZED_FOR_ROLE, (String) webToken.claim().getParameter("role"));
+                headers.putSingle(AUTHORIZED_FOR_ID, jwtClaims.getClaimValueAsString("user_id"));
+                headers.putSingle(AUTHORIZED_FOR_SUBJECT, jwtClaims.getSubject());
+                headers.putSingle(AUTHORIZED_FOR_NAME, jwtClaims.getClaimValueAsString("name"));
+                headers.putSingle(AUTHORIZED_FOR_ROLE, jwtClaims.getClaimValueAsString("role"));
                 break;
             case "static":
-                headers.putSingle(AUTHORIZED_FOR_SUBJECT, webToken.claim().subject());
-                headers.putSingle(AUTHORIZED_FOR_ROLE, (String) webToken.claim().getParameter("role"));
+                headers.putSingle(AUTHORIZED_FOR_SUBJECT, jwtClaims.getSubject());
+                headers.putSingle(AUTHORIZED_FOR_ROLE, jwtClaims.getClaimValueAsString("role"));
                 break;
             default:
                 log.warn("No auth header stamped for type: {}", tokenType);

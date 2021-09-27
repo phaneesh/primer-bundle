@@ -15,10 +15,8 @@
  */
 package io.dropwizard.primer;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.jsontype.NamedType;
-import com.github.toastshaman.dropwizard.auth.jwt.JsonWebTokenParser;
-import com.github.toastshaman.dropwizard.auth.jwt.hmac.HmacSHA512Verifier;
-import com.github.toastshaman.dropwizard.auth.jwt.parser.DefaultJsonWebTokenParser;
 import com.google.common.hash.Hashing;
 import feign.Feign;
 import feign.Logger;
@@ -33,6 +31,7 @@ import io.dropwizard.ConfiguredBundle;
 import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.primer.auth.PrimerAuthorizationRegistry;
 import io.dropwizard.primer.auth.authorizer.PrimerAnnotationAuthorizer;
+import io.dropwizard.primer.auth.orchestration.KeyOrchestrator;
 import io.dropwizard.primer.auth.token.PrimerTokenProvider;
 import io.dropwizard.primer.auth.filter.PrimerAuthAnnotationFilter;
 import io.dropwizard.primer.auth.filter.PrimerAuthConfigFilter;
@@ -63,6 +62,7 @@ import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.protocol.HTTP;
+import org.jose4j.keys.HmacKey;
 
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -129,7 +129,7 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
 
     configHolder = new PrimerConfigurationHolder(primerConfig);
 
-    initializeAuthorization(configuration);
+    initializeAuthorization(configuration, environment.getObjectMapper());
 
     final JacksonDecoder decoder = new JacksonDecoder();
     final JacksonEncoder encoder = new JacksonEncoder();
@@ -252,12 +252,8 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
     }
   }
 
-  public void initializeAuthorization(T configuration) {
-    final JsonWebTokenParser tokenParser = new DefaultJsonWebTokenParser();
+  public void initializeAuthorization(T configuration, ObjectMapper mapper) {
     PrimerBundleConfiguration primerConfig = configHolder.getConfig();
-
-    final byte[] secretKey = primerConfig.getPrivateKey().getBytes(StandardCharsets.UTF_8);
-    final HmacSHA512Verifier tokenVerifier = new HmacSHA512Verifier(secretKey);
 
     final Set<String> whiteListUrls = new HashSet<>();
     final Set<String> dynamicWhiteList = withWhiteList(configuration);
@@ -289,7 +285,9 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
         permissionMatrix.getStaticAuthorizations().addAll(dynamicAuthMatrix.getStaticAuthorizations());
       }
     }
-    PrimerAuthorizationRegistry.init(permissionMatrix, whiteListUrls, primerConfig, tokenParser, tokenVerifier);
+
+    KeyOrchestrator keyOrchestrator = new KeyOrchestrator(primerConfig.getJwkPublicKeyCacheMaxSize(), mapper);
+    PrimerAuthorizationRegistry.init(permissionMatrix, whiteListUrls, primerConfig, keyOrchestrator);
   }
 
 }

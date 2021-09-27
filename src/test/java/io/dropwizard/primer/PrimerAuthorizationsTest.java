@@ -17,21 +17,25 @@
 package io.dropwizard.primer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
-import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebTokenClaim;
-import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebTokenHeader;
 import com.github.tomakehurst.wiremock.junit.WireMockRule;
 import io.dropwizard.primer.auth.AuthType;
 import io.dropwizard.primer.auth.PrimerAuthorizationRegistry;
 import io.dropwizard.primer.core.VerifyResponse;
 import io.dropwizard.primer.exception.PrimerException;
-import org.joda.time.DateTime;
+import org.jose4j.jwk.JsonWebKey;
+import org.jose4j.jwt.NumericDate;
+import org.jose4j.keys.HmacKey;
+import org.jose4j.lang.JoseException;
+import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
 import static org.junit.Assert.*;
@@ -56,16 +60,25 @@ public class PrimerAuthorizationsTest extends BaseTest {
 
     @Test
     public void testAuthorizedCall() throws PrimerException, JsonProcessingException, ExecutionException {
-            stubFor(post(urlEqualTo("/v1/verify/test/test"))
-                    .willReturn(aResponse()
-                            .withStatus(200)
-                            .withHeader("Content-Type", "application/json")
-                            .withBody(mapper.writeValueAsBytes(VerifyResponse.builder()
-                                    .expiresAt(Instant.now().plusSeconds(10000).toEpochMilli())
-                                    .token(token)
-                                    .userId("test")
-                                    .build()))));
-        assertNotNull(PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", token, AuthType.CONFIG));
+        stubFor(post(urlEqualTo("/v1/verify/test/test"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(mapper.writeValueAsBytes(VerifyResponse.builder()
+                                .expiresAt(Instant.now().plusSeconds(10000).toEpochMilli())
+                                .token(hmacToken)
+                                .userId("test")
+                                .build()))));
+        assertNotNull(PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", hmacToken, AuthType.CONFIG, null));
+
+        stubFor(get(urlEqualTo("/v1/key/" + rsaJwkKeyId))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(mapper.writeValueAsBytes(
+                                mapper.readTree(rsaJsonWebKey.toJson(JsonWebKey.OutputControlLevel.PUBLIC_ONLY))
+                        ))));
+        assertNotNull(PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", rsaToken, AuthType.CONFIG, rsaJwkKeyId));
     }
 
     @Test
@@ -76,16 +89,16 @@ public class PrimerAuthorizationsTest extends BaseTest {
                         .withHeader("Content-Type", "application/json")
                         .withBody(mapper.writeValueAsBytes(VerifyResponse.builder()
                                 .expiresAt(Instant.now().plusSeconds(10000).toEpochMilli())
-                                .token(token)
+                                .token(hmacToken)
                                 .userId("test")
                                 .build()))));
-        assertNotNull(PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", token, AuthType.ANNOTATION));
+        assertNotNull(PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", hmacToken, AuthType.ANNOTATION, null));
     }
 
     @Test
     public void testUnAuthorizedCallWithInvalidRole() {
         try {
-            PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", buildTokenWithInvalidRole(), AuthType.CONFIG);
+            PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", buildTokenWithInvalidRole(), AuthType.CONFIG, null);
             fail("Should have failed!!");
         } catch (Exception e) {
             assertTrue(validateException(e));
@@ -95,7 +108,7 @@ public class PrimerAuthorizationsTest extends BaseTest {
     @Test
     public void testAnnotatedUnAuthorizedCall() throws PrimerException, ExecutionException {
         try {
-            PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", token, AuthType.ANNOTATION);
+            PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", hmacToken, AuthType.ANNOTATION, null);
             fail("Should have failed!!");
         } catch (Exception e) {
             assertTrue(validateException(e));
@@ -105,7 +118,7 @@ public class PrimerAuthorizationsTest extends BaseTest {
     @Test
     public void testUnAuthorizedCallWithInvalidMethod() throws PrimerException, ExecutionException {
         try {
-        PrimerAuthorizationRegistry.authorize("simple/auth/test", "POST", token, AuthType.CONFIG);
+        PrimerAuthorizationRegistry.authorize("simple/auth/test", "POST", hmacToken, AuthType.CONFIG, null);
         fail("Should have failed!!");
     } catch (Exception e) {
         assertTrue(validateException(e));
@@ -116,7 +129,7 @@ public class PrimerAuthorizationsTest extends BaseTest {
     @Test
     public void testUnAuthorizedCallWithInvalidPath() throws PrimerException, ExecutionException {
         try {
-            PrimerAuthorizationRegistry.authorize("simple/auth/test/invalid", "GET", token, AuthType.CONFIG);
+            PrimerAuthorizationRegistry.authorize("simple/auth/test/invalid", "GET", hmacToken, AuthType.CONFIG, null);
             fail("Should have failed!!");
         } catch (Exception e) {
             assertTrue(validateException(e));
@@ -126,31 +139,47 @@ public class PrimerAuthorizationsTest extends BaseTest {
     @Test
     public void testUnAuthorizedCallWithInvalidRoleAndMethod() {
         try {
-            PrimerAuthorizationRegistry.authorize("simple/auth/test", "POST", buildTokenWithInvalidRole(), AuthType.CONFIG);
+            PrimerAuthorizationRegistry.authorize("simple/auth/test", "POST", buildTokenWithInvalidRole(), AuthType.CONFIG, null);
             fail("Should have failed!!");
         } catch (Exception e) {
             assertTrue(validateException(e));
         }
     }
 
-    private String buildTokenWithInvalidRole() {
-        JsonWebToken jwt = JsonWebToken.builder()
-                .header(
-                        JsonWebTokenHeader.HS512()
-                )
-                .claim(JsonWebTokenClaim
-                        .builder()
-                        .expiration(DateTime.now().plusYears(1))
-                        .subject("test")
-                        .issuer("test")
-                        .issuedAt(DateTime.now())
-                        .param("user_id", "test")
-                        .param("role", "test_invalid")
-                        .param("name", "test")
-                        .param("type", "dynamic")
-                        .build())
-                .build();
-        return hmacSHA512Signer.sign(jwt);
+    @Test
+    public void testAuthorizedCallGetKeyFailed() throws PrimerException, JsonProcessingException, ExecutionException {
+        try {
+            stubFor(post(urlEqualTo("/v1/verify/test/test"))
+                    .willReturn(aResponse()
+                            .withStatus(200)
+                            .withHeader("Content-Type", "application/json")
+                            .withBody(mapper.writeValueAsBytes(VerifyResponse.builder()
+                                    .expiresAt(Instant.now().plusSeconds(10000).toEpochMilli())
+                                    .token(rsaToken)
+                                    .userId("test")
+                                    .build()))));
+
+            stubFor(get(urlEqualTo("/v1/key/" + rsaJwkKeyId))
+                    .willReturn(aResponse()
+                            .withStatus(500)
+                            .withHeader("Content-Type", "application/json")));
+            assertNotNull(PrimerAuthorizationRegistry.authorize("simple/auth/test", "GET", rsaToken, AuthType.CONFIG, rsaJwkKeyId));
+            fail("Should have failed!!");
+        } catch (CompletionException e) {
+            Assert.assertTrue(true);
+        }
+    }
+
+    private String buildTokenWithInvalidRole() throws JoseException {
+        Map<String, Object> claimsMap = new HashMap<>();
+        claimsMap.put("user_id" , "test");
+        claimsMap.put("role" , "test_invalid");
+        claimsMap.put("name", "test");
+        claimsMap.put("type", "dynamic");
+        NumericDate expiryDate = NumericDate.now();
+        expiryDate.addSeconds(TimeUnit.SECONDS.convert(365, TimeUnit.DAYS));
+        HmacKey hmacKey = new HmacKey(primerBundleConfiguration.getPrivateKey().getBytes());
+        return generate(hmacKey, "test", "test", claimsMap, expiryDate);
     }
 
     private boolean validateException(Throwable e) {

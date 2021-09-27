@@ -19,10 +19,6 @@ package io.dropwizard.primer;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.health.HealthCheckRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.github.toastshaman.dropwizard.auth.jwt.hmac.HmacSHA512Signer;
-import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
-import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebTokenClaim;
-import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebTokenHeader;
 import io.dropwizard.Configuration;
 import io.dropwizard.jersey.DropwizardResourceConfig;
 import io.dropwizard.jersey.setup.JerseyEnvironment;
@@ -37,11 +33,26 @@ import io.dropwizard.primer.model.PrimerBundleConfiguration;
 import io.dropwizard.primer.model.PrimerSimpleEndpoint;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
+
+import java.security.Key;
+import java.security.interfaces.RSAPrivateKey;
 import java.util.Collections;
-import org.joda.time.DateTime;
+
+import org.jose4j.jwk.RsaJsonWebKey;
+import org.jose4j.jwk.RsaJwkGenerator;
+import org.jose4j.jws.AlgorithmIdentifiers;
+import org.jose4j.jws.JsonWebSignature;
+import org.jose4j.jwt.JwtClaims;
+import org.jose4j.jwt.NumericDate;
+import org.jose4j.jwx.HeaderParameterNames;
+import org.jose4j.keys.HmacKey;
+import org.jose4j.lang.JoseException;
 import org.junit.Before;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -104,26 +115,10 @@ public abstract class BaseTest {
 
     protected PrimerBundleConfiguration primerBundleConfiguration;
 
-    protected HmacSHA512Signer hmacSHA512Signer;
-
-    public JsonWebToken webToken = JsonWebToken.builder()
-            .header(
-                    JsonWebTokenHeader.HS512()
-            )
-            .claim(JsonWebTokenClaim
-                    .builder()
-                    .expiration(DateTime.now().plusYears(1))
-                    .subject("test")
-                    .issuer("test")
-                    .issuedAt(DateTime.now())
-                    .param("user_id", "test")
-                    .param("role", "test")
-                    .param("name", "test")
-                    .param("type", "dynamic")
-                    .build())
-            .build();
-
-    public String token = null;
+    public String hmacToken = null;
+    public String rsaToken = null;
+    public String rsaJwkKeyId = "key1";
+    RsaJsonWebKey rsaJsonWebKey;
 
     protected static BundleTestResource bundleTestResource = new BundleTestResource();
 
@@ -142,7 +137,7 @@ public abstract class BaseTest {
                 .cacheMaxSize(100)
                 .clockSkew(60)
                 .endpoint(new PrimerSimpleEndpoint("simple", "localhost", 9999))
-                .privateKey("thisisatestkey")
+                .privateKey("testisatesttestisatesttestisatesttestisatesttestisatesttisatestt")
                 .prefix("Bearer")
                 .whiteList("simple/noauth/test")
                 .build();
@@ -151,9 +146,19 @@ public abstract class BaseTest {
 
         bundle.run(configuration, environment);
 
-        hmacSHA512Signer = new HmacSHA512Signer(primerBundleConfiguration.getPrivateKey().getBytes());
+        Map<String, Object> claimsMap = new HashMap<>();
+        claimsMap.put("user_id" , "test");
+        claimsMap.put("role" , "test");
+        claimsMap.put("name", "test");
+        claimsMap.put("type", "dynamic");
+        NumericDate expiryDate = NumericDate.now();
+        expiryDate.addSeconds(TimeUnit.SECONDS.convert(365, TimeUnit.DAYS));
+        HmacKey hmacKey = new HmacKey(primerBundleConfiguration.getPrivateKey().getBytes());
+        hmacToken = generate(hmacKey, "test", "test", claimsMap, expiryDate);
 
-        token = hmacSHA512Signer.sign(webToken);
+        rsaJsonWebKey = RsaJwkGenerator.generateJwk(2048);
+        rsaJsonWebKey.setKeyId(rsaJwkKeyId);
+        rsaToken = generate(rsaJsonWebKey.getRsaPrivateKey(), "test", "test", claimsMap, expiryDate);
 
         lifecycleEnvironment.getManagedObjects().forEach(object -> {
             try {
@@ -164,5 +169,35 @@ public abstract class BaseTest {
         });
 
         environment.jersey().register(bundleTestResource);
+    }
+
+    public String generate(final Key key, final String subject, final String issuer,
+                           final Map<String, Object> claimsMap, final NumericDate expiryTime)
+            throws JoseException {
+        JwtClaims claims = new JwtClaims();
+        claims.setSubject(subject);
+        claims.setIssuedAtToNow();
+        claims.setIssuer(issuer);
+        for (Map.Entry<String, Object> entry : claimsMap.entrySet()) {
+            claims.setClaim(entry.getKey(), entry.getValue());
+        }
+        claims.setExpirationTime(expiryTime);
+
+        JsonWebSignature jws = new JsonWebSignature();
+
+        // The payload of the JWS is JSON content of the JWT Claims
+        jws.setPayload(claims.toJson());
+
+        // The JWT is signed using the private key
+        jws.setKey(key);
+
+        jws.setHeader(HeaderParameterNames.TYPE, "JWT");
+        if (key instanceof HmacKey) {
+            jws.setAlgorithmHeaderValue(AlgorithmIdentifiers.HMAC_SHA512);
+        } else if (key instanceof RSAPrivateKey) {
+            jws.setAlgorithmHeaderValue(AlgorithmIdentifiers.RSA_USING_SHA256);
+        }
+
+        return jws.getCompactSerialization();
     }
 }

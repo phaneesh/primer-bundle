@@ -2,7 +2,6 @@ package io.dropwizard.primer.auth.filter;
 
 import com.codahale.metrics.annotation.Metered;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.github.toastshaman.dropwizard.auth.jwt.model.JsonWebToken;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import io.dropwizard.primer.auth.AuthFilter;
 import io.dropwizard.primer.auth.AuthType;
@@ -17,6 +16,7 @@ import io.dropwizard.primer.util.CryptUtil;
 import io.dropwizard.primer.model.PrimerConfigurationHolder;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
+import org.jose4j.jwt.JwtClaims;
 
 import javax.annotation.Priority;
 import javax.crypto.spec.GCMParameterSpec;
@@ -82,17 +82,17 @@ public class PrimerAuthAnnotationFilter extends AuthFilter {
         } else {
             try {
                 final String decryptedToken = CryptUtil.tokenDecrypt(token.get(), secretKeySpec, ivParameterSpec);
-                JsonWebToken webToken = authorize(requestContext, decryptedToken, this.authType);
+                JwtClaims jwtClaims = authorize(requestContext, decryptedToken, this.authType);
                 //Stamp authorization headers for downstream services which can
                 // use this to stop token forgery & misuse
-                primerTokenProvider.stampHeaders(requestContext, webToken, decryptedToken);
+                primerTokenProvider.stampHeaders(requestContext, jwtClaims, decryptedToken);
 
                 // Do not proceed further with Auth if its disabled or whitelisted
                 if (isWhitelisted())
                     return;
                 // Execute authorizer
                 if (authorizer != null)
-                    authorizer.authorize(webToken, requestContext, getAuthorizeAnnotation());
+                    authorizer.authorize(jwtClaims, requestContext, getAuthorizeAnnotation());
 
             } catch (UncheckedExecutionException e) {
                 if (e.getCause() instanceof CompletionException) {

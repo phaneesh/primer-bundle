@@ -50,9 +50,9 @@ public class PrimerCookieTest extends BaseTest {
      */
     @Test
     public void testForValidCookie() {
-        ContainerRequest requestContext = containerRequestWithAuthCookie("/apis/oculus/user", primerCookie, token);
+        ContainerRequest requestContext = containerRequestWithAuthCookie("/apis/oculus/user", primerCookie, hmacToken);
         Optional<String> encryptedToken = authFilterWithDefaultProvider.getToken(requestContext);
-        Assert.assertEquals(encryptedToken.get(),token);
+        Assert.assertEquals(encryptedToken.get(), hmacToken);
     }
 
     /**
@@ -62,7 +62,7 @@ public class PrimerCookieTest extends BaseTest {
      */
     @Test
     public void testForInValidCookie() {
-        ContainerRequest requestContext = containerRequestWithAuthCookie("/apis/oculus/user", "SCP_G_TOKEN", token);
+        ContainerRequest requestContext = containerRequestWithAuthCookie("/apis/oculus/user", "SCP_G_TOKEN", hmacToken);
         Optional<String> encryptedToken = authFilterWithDefaultProvider.getToken(requestContext);
         Assert.assertEquals(encryptedToken, Optional.empty());
     }
@@ -74,9 +74,9 @@ public class PrimerCookieTest extends BaseTest {
      */
     @Test
     public void testForValidCookieWithCustomProvider() {
-        ContainerRequest requestContext = containerRequestWithAuthCookie("/apis/oculus/user", "OCULUS_G_TOKEN", token);
+        ContainerRequest requestContext = containerRequestWithAuthCookie("/apis/oculus/user", "OCULUS_G_TOKEN", hmacToken);
         Optional<String> encryptedToken = authFilterWithCustomTokenProvider.getToken(requestContext);
-        Assert.assertEquals(encryptedToken.get(),token);
+        Assert.assertEquals(encryptedToken.get(), hmacToken);
     }
 
     /**
@@ -86,7 +86,7 @@ public class PrimerCookieTest extends BaseTest {
      */
     @Test
     public void testForInValidCookieCustomProvider() {
-        ContainerRequest requestContext = containerRequestWithAuthCookie("/apis/oculus/user", primerCookie, token);
+        ContainerRequest requestContext = containerRequestWithAuthCookie("/apis/oculus/user", primerCookie, hmacToken);
         Optional<String> encryptedToken = authFilterWithCustomTokenProvider.getToken(requestContext);
         Assert.assertEquals(encryptedToken, Optional.empty());
     }
@@ -98,7 +98,7 @@ public class PrimerCookieTest extends BaseTest {
     @Test
     public void testForCookieDisabledFlow() {
         primerBundleConfiguration.setCookiesEnabled(false);
-        ContainerRequest requestContext = containerRequestWithAuthCookie("/apis/oculus/user", primerCookie, token);
+        ContainerRequest requestContext = containerRequestWithAuthCookie("/apis/oculus/user", primerCookie, hmacToken);
         Optional<String> encryptedToken = authFilterWithDefaultProvider.getToken(requestContext);
         Assert.assertEquals(encryptedToken, Optional.empty());
     }
@@ -110,9 +110,9 @@ public class PrimerCookieTest extends BaseTest {
      */
     @Test
     public void testForAuthHeader() {
-        ContainerRequest requestContext = containerRequestWithAuthHeader("/apis/test/user", token);
+        ContainerRequest requestContext = containerRequestWithAuthHeader("/apis/test/user", hmacToken);
         Optional<String> encryptedToken = authFilterWithDefaultProvider.getToken(requestContext);
-        Assert.assertEquals(encryptedToken.get(),token);
+        Assert.assertEquals(encryptedToken.get(), hmacToken);
     }
 
 

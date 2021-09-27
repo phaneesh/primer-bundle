@@ -124,7 +124,7 @@ public class PrimerBundleTests extends BaseTest {
                         .withHeader("Content-Type", "application/json")
                         .withBody(mapper.writeValueAsBytes(VerifyResponse.builder()
                                 .expiresAt(Instant.now().plusSeconds(10000).toEpochMilli())
-                                .token(token)
+                                .token(hmacToken)
                                 .userId("test")
                                 .build()))));
 
