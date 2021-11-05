@@ -22,19 +22,30 @@ import lombok.*;
  * @author phaneesh
  */
 @Data
-@AllArgsConstructor
-@NoArgsConstructor
-@Builder
 @EqualsAndHashCode(callSuper = true)
 public class PrimerRangerEndpoint extends PrimerEndpoint {
+    private final String type;
 
-    private String type;
+    private final String namespace;
 
-    private String namespace;
+    private final String zookeeper;
 
-    private String zookeeper;
+    private final String service;
 
-    private String service;
+    private final String environment;
 
-    private String environment;
+    //Backward compatibility for <=2.0.17
+    public PrimerRangerEndpoint(String type, String namespace, String zookeeper, String service, String environment) {
+        this(type, namespace, zookeeper, service, environment, "", false);
+    }
+
+    @Builder
+    public PrimerRangerEndpoint(String type, String namespace, String zookeeper, String service, String environment, String rootPathPrefix, boolean secure) {
+        super(rootPathPrefix, secure);
+        this.type = type;
+        this.namespace = namespace;
+        this.zookeeper = zookeeper;
+        this.service = service;
+        this.environment = environment;
+    }
 }

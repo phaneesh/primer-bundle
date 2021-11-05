@@ -17,12 +17,26 @@
 package io.dropwizard.primer.model;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 
 /**
  * @author phaneesh
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type", visible = true)
+@AllArgsConstructor
 public abstract class PrimerEndpoint {
 
     public abstract String getType();
+
+    @Getter
+    private final String rootPathPrefix;
+
+    @Getter
+    private final boolean secure;
+
+    protected PrimerEndpoint() {
+        rootPathPrefix = "";
+        secure = false;
+    }
 }
