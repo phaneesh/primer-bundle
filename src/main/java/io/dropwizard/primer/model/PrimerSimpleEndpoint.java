@@ -16,10 +16,7 @@
 
 package io.dropwizard.primer.model;
 
-import lombok.Builder;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NonNull;
+import lombok.*;
 
 import javax.annotation.Nonnegative;
 
@@ -27,17 +24,18 @@ import javax.annotation.Nonnegative;
  * @author phaneesh
  */
 @EqualsAndHashCode(callSuper = true)
+@NoArgsConstructor
 @Data
+@Builder
 public class PrimerSimpleEndpoint extends PrimerEndpoint {
 
-    @NonNull
-    private final String type;
+    private String type;
 
     @NonNull
-    private final String host;
+    private String host;
 
     @Nonnegative
-    private final int port;
+    private int port;
 
     //Backward compatibility for <=2.0.17
     public PrimerSimpleEndpoint(String type, String host, int port) {
@@ -53,14 +51,18 @@ public class PrimerSimpleEndpoint extends PrimerEndpoint {
     }
 
     @Builder
-    public PrimerSimpleEndpoint(String type, String host, int port, String rootPathPrefix, boolean secure) {
+    private PrimerSimpleEndpoint(String type, String host, int port, String rootPathPrefix, boolean secure) {
         super(rootPathPrefix, secure);
         this.type = type;
         this.host = host;
+        this.port = port;
+    }
+
+    public int getPort() {
         if (port == 0) {
-            this.port = getDefaultPort();
+            return getDefaultPort();
         } else {
-            this.port = port;
+            return port;
         }
     }
 }

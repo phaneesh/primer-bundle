@@ -1,6 +1,7 @@
 package io.dropwizard.primer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.flipkart.ranger.ServiceProviderBuilders;
 import com.flipkart.ranger.healthcheck.Healthcheck;
 import com.flipkart.ranger.healthcheck.HealthcheckStatus;
@@ -10,7 +11,7 @@ import com.google.common.collect.Lists;
 import feign.*;
 import feign.ranger.common.ShardInfo;
 import io.dropwizard.primer.client.PrimerClient;
-import io.dropwizard.primer.model.PrimerRangerEndpoint;
+import io.dropwizard.primer.model.PrimerEndpoint;
 import io.dropwizard.primer.target.PrimerTarget;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.curator.framework.CuratorFramework;
@@ -34,7 +35,7 @@ public class PrimerRangerTargetTest {
 
     private CuratorFramework curator;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = new ObjectMapper(new YAMLFactory());
 
     private final Logger.ErrorLogger logger = new Logger.ErrorLogger();
 
@@ -95,31 +96,35 @@ public class PrimerRangerTargetTest {
 
     }
 
+    private void check(String extraConfig, String expectedUrl) throws Exception {
+        PrimerEndpoint primerEndpoint = objectMapper.readValue(
+                "---\n" +
+                        "type: ranger\n" +
+                        "namespace: test\n" +
+                        "service: test\n" +
+                        "environment: test\n" +
+                        extraConfig, PrimerEndpoint.class);
+        Target<PrimerClient> primerClientTarget = PrimerTarget.builder().primerEndpoint(primerEndpoint).objectMapper(objectMapper).curatorFrameworkSupplier(()->curator).build().getTarget();
+        assertEquals(expectedUrl, primerClientTarget.url());
+    }
+
     @Test
     public void testHttpPrimerClient() throws Exception {
-        PrimerRangerEndpoint primerRangerEndpoint = PrimerRangerEndpoint.builder().type("ranger").environment("test").namespace("test").service("test").build();
-        Target<PrimerClient> primerClientTarget = PrimerTarget.builder().primerEndpoint(primerRangerEndpoint).objectMapper(objectMapper).curatorFrameworkSupplier(()->curator).build().getTarget();
-        assertEquals("http://127.0.0.1:9999", primerClientTarget.url());
+        check("", "http://127.0.0.1:9999");
     }
 
     @Test
     public void testHttpsPrimerClient() throws Exception {
-        PrimerRangerEndpoint primerRangerEndpoint = PrimerRangerEndpoint.builder().type("ranger").environment("test").namespace("test").service("test").secure(true).build();
-        Target<PrimerClient> primerClientTarget = PrimerTarget.builder().primerEndpoint(primerRangerEndpoint).objectMapper(objectMapper).curatorFrameworkSupplier(()->curator).build().getTarget();
-        assertEquals("https://127.0.0.1:9999", primerClientTarget.url());
+        check("secure: true", "https://127.0.0.1:9999");
     }
 
     @Test
     public void testHttpPrimerClientWithRootPathPrefix() throws Exception {
-        PrimerRangerEndpoint primerRangerEndpoint = PrimerRangerEndpoint.builder().type("ranger").environment("test").namespace("test").service("test").rootPathPrefix("apis/ks").build();
-        Target<PrimerClient> primerClientTarget = PrimerTarget.builder().primerEndpoint(primerRangerEndpoint).objectMapper(objectMapper).curatorFrameworkSupplier(()->curator).build().getTarget();
-        assertEquals("http://127.0.0.1:9999/apis/ks", primerClientTarget.url());
+        check("rootPathPrefix: apis/ks", "http://127.0.0.1:9999/apis/ks");
     }
 
     @Test
     public void testHttpsPrimerClientWithRootPathPrefix() throws Exception {
-        PrimerRangerEndpoint primerRangerEndpoint = PrimerRangerEndpoint.builder().type("ranger").environment("test").namespace("test").service("test").secure(true).rootPathPrefix("apis/ks").build();
-        Target<PrimerClient> primerClientTarget = PrimerTarget.builder().primerEndpoint(primerRangerEndpoint).objectMapper(objectMapper).curatorFrameworkSupplier(()->curator).build().getTarget();
-        assertEquals("https://127.0.0.1:9999/apis/ks", primerClientTarget.url());
+        check("secure: true\n" + "rootPathPrefix: apis/ks", "https://127.0.0.1:9999/apis/ks");
     }
 }
