@@ -46,7 +46,7 @@ import static org.junit.Assert.fail;
 /**
  * @author phaneesh
  */
-public class PrimerBundleTests extends BaseTest {
+public class PrimerBundleTest extends BaseTest {
 
     @ClassRule
     public static ResourceTestRule resources = ResourceTestRule.builder()
