@@ -10,6 +10,7 @@ import io.dropwizard.primer.auth.annotation.Authorize;
 import io.dropwizard.primer.auth.authorizer.PrimerAnnotationAuthorizer;
 import io.dropwizard.primer.auth.token.PrimerTokenProvider;
 import io.dropwizard.primer.auth.whitelist.AuthWhitelistValidator;
+import io.dropwizard.primer.core.PrimerEnableChecker;
 import io.dropwizard.primer.core.PrimerError;
 import io.dropwizard.primer.exception.PrimerException;
 import io.dropwizard.primer.util.CryptUtil;
@@ -52,22 +53,26 @@ public class PrimerAuthAnnotationFilter extends AuthFilter {
 
     private final GCMParameterSpec ivParameterSpec;
 
+    private final PrimerEnableChecker primerEnableChecker;
+
     @Builder
     public PrimerAuthAnnotationFilter(final PrimerConfigurationHolder configHolder, final ObjectMapper objectMapper,
                                       final PrimerAnnotationAuthorizer authorizer, final SecretKeySpec secretKeySpec,
                                       final GCMParameterSpec ivParameterSpec,
-                                      final PrimerTokenProvider primerTokenProvider) {
+                                      final PrimerTokenProvider primerTokenProvider,
+                                      final PrimerEnableChecker primerEnableChecker) {
         super(AuthType.ANNOTATION, configHolder, objectMapper, primerTokenProvider);
         this.authorizer = authorizer;
         this.secretKeySpec = secretKeySpec;
         this.ivParameterSpec = ivParameterSpec;
+        this.primerEnableChecker = primerEnableChecker;
     }
 
     @Override
     @Metered(name = "authorize")
     public void filter(ContainerRequestContext requestContext) throws IOException {
 
-        if (!isEnabled())
+        if (!isEnabled() || !primerEnableChecker.isEnabled())
             return;
 
         Optional<String> token = getToken(requestContext);
