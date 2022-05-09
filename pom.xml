@@ -4,7 +4,7 @@
 
     <groupId>io.raven.dropwizard</groupId>
     <artifactId>dropwizard-primer</artifactId>
-    <version>2.0.18</version>
+    <version>2.0.19</version>
     <packaging>jar</packaging>
 
     <name>dropwizard-primer</name>
@@ -49,7 +49,7 @@
         <lombok.maven.version>1.18.16.0</lombok.maven.version>
         <jose4j.version>0.7.7</jose4j.version>
         <feign.version>11.0</feign.version>
-        <feign.ranger.version>0.1.6</feign.ranger.version>
+        <feign.ranger.version>0.1.8</feign.ranger.version>
         <caffeine.version>2.8.8</caffeine.version>
         <slf4j.version>1.7.30</slf4j.version>
         <junit.version>5.7.0</junit.version>
@@ -57,6 +57,7 @@
         <mockito.version>2.13.0</mockito.version>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
+        <curator.version>3.1.0</curator.version>
     </properties>
 
     <repositories>
@@ -137,6 +138,12 @@
             <groupId>io.dropwizard</groupId>
             <artifactId>dropwizard-testing</artifactId>
             <version>${dropwizard.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.curator</groupId>
+            <artifactId>curator-test</artifactId>
+            <version>${curator.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>

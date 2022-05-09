@@ -45,6 +45,7 @@ import io.dropwizard.primer.model.PrimerBundleConfiguration;
 import io.dropwizard.primer.model.PrimerConfigurationHolder;
 import io.dropwizard.primer.model.PrimerRangerEndpoint;
 import io.dropwizard.primer.model.PrimerSimpleEndpoint;
+import io.dropwizard.primer.target.PrimerTarget;
 import io.dropwizard.server.DefaultServerFactory;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
@@ -143,7 +144,7 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
     environment.lifecycle().manage(new Managed() {
 
       @Override
-      public void start() {
+      public void start() throws Exception {
 
         // Create socket configuration
         SocketConfig socketConfig = SocketConfig.custom()
@@ -236,25 +237,14 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
         .build());
   }
 
-  private Target<PrimerClient> getPrimerTarget(T configuration, Environment environment) {
-    final val primerConfig = getPrimerConfiguration(configuration);
-    switch (primerConfig.getEndpoint().getType()) {
-      case "simple":
-        final val endpoint = (PrimerSimpleEndpoint) primerConfig.getEndpoint();
-        return new Target.HardCodedTarget<>(PrimerClient.class,
-            String.format("http://%s:%d", endpoint.getHost(), endpoint.getPort()));
-      case "ranger":
-        final val config = (PrimerRangerEndpoint) primerConfig.getEndpoint();
-        try {
-          return new RangerTarget<>(PrimerClient.class, config.getEnvironment(), config.getNamespace(),
-              config.getService(), getCurator(configuration), false, environment.getObjectMapper());
-        } catch (Exception e) {
-          log.error("Error creating ranger endpoint for primer", e);
-          return null;
-        }
-      default:
-        throw new IllegalArgumentException("unknown primer target type specified");
-    }
+  private Target<PrimerClient> getPrimerTarget(T configuration, Environment environment) throws Exception {
+    val primerConfig = getPrimerConfiguration(configuration);
+    return PrimerTarget.builder()
+            .primerEndpoint(primerConfig.getEndpoint())
+            .objectMapper(environment.getObjectMapper())
+            .curatorFrameworkSupplier(()->getCurator(configuration))
+            .build()
+            .getTarget();
   }
 
   public void initializeAuthorization(T configuration, ObjectMapper mapper) {

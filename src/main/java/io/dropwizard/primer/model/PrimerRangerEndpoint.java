@@ -22,12 +22,9 @@ import lombok.*;
  * @author phaneesh
  */
 @Data
-@AllArgsConstructor
 @NoArgsConstructor
-@Builder
 @EqualsAndHashCode(callSuper = true)
 public class PrimerRangerEndpoint extends PrimerEndpoint {
-
     private String type;
 
     private String namespace;
@@ -37,4 +34,19 @@ public class PrimerRangerEndpoint extends PrimerEndpoint {
     private String service;
 
     private String environment;
+
+    //Backward compatibility for <=2.0.17
+    public PrimerRangerEndpoint(String type, String namespace, String zookeeper, String service, String environment) {
+        this(type, namespace, zookeeper, service, environment, "", false);
+    }
+
+    @Builder
+    private PrimerRangerEndpoint(String type, String namespace, String zookeeper, String service, String environment, String rootPathPrefix, boolean secure) {
+        super(rootPathPrefix, secure);
+        this.type = type;
+        this.namespace = namespace;
+        this.zookeeper = zookeeper;
+        this.service = service;
+        this.environment = environment;
+    }
 }
