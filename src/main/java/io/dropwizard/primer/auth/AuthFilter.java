@@ -55,7 +55,8 @@ public abstract class AuthFilter implements ContainerRequestFilter {
 
     protected void handleException(Throwable e, ContainerRequestContext requestContext, String token) throws JsonProcessingException {
         if (e.getCause() instanceof InvalidJwtException || e instanceof InvalidJwtException) {
-            InvalidJwtException invalidJwtException = (InvalidJwtException) e;
+            InvalidJwtException invalidJwtException =
+                    e instanceof InvalidJwtException ? (InvalidJwtException) e : (InvalidJwtException) e.getCause();
             if (invalidJwtException.hasExpired()) {
                 log.error("Token Expiry Error: {}", e.getMessage());
                 abortRequest(
