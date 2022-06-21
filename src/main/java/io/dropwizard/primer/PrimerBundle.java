@@ -36,6 +36,7 @@ import io.dropwizard.primer.auth.token.PrimerTokenProvider;
 import io.dropwizard.primer.auth.filter.PrimerAuthAnnotationFilter;
 import io.dropwizard.primer.auth.filter.PrimerAuthConfigFilter;
 import io.dropwizard.primer.client.PrimerClient;
+import io.dropwizard.primer.core.PrimerEnableChecker;
 import io.dropwizard.primer.core.PrimerError;
 import io.dropwizard.primer.exception.PrimerException;
 import io.dropwizard.primer.exception.PrimerExceptionMapper;
@@ -63,7 +64,6 @@ import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.protocol.HTTP;
-import org.jose4j.keys.HmacKey;
 
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -100,6 +100,10 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
   public static PrimerClient getPrimerClient() {
     return primerClient;
   }
+
+  public PrimerEnableChecker getPrimerEnableChecker() {
+    return new PrimerEnableChecker();
+  };
 
   /**
    * Default method which provides a default curator for service discovery to work in case there is no other
@@ -228,6 +232,7 @@ public abstract class PrimerBundle<T extends Configuration> implements Configure
         .authorizer(authorizer())
         .secretKeySpec(secretKeySpec)
         .primerTokenProvider(getPrimerTokenProvider(configuration))
+        .primerEnableChecker(getPrimerEnableChecker())
         .ivParameterSpec(ivParameterSpec)
         .build());
   }
