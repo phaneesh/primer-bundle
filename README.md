@@ -1,7 +1,7 @@
-# Dropwizard Primer Bundle [![Travis build status](https://travis-ci.org/phaneesh/primer-bundle.svg?branch=master)](https://travis-ci.org/phaneesh/msgpack-bundle)
+# Dropwizard Primer Bundle ![Build Status](https://github.com/phaneesh/primer-bundle/actions/workflows/release/badge.svg)
 
 This bundle adds Primer JWT service support for dropwizard.
-This bundle compiles only on Java 8.
+This bundle compiles only on Java 8+.
  
 ## Dependencies
 * [Primer](https://github.com/phaneesh/primer)

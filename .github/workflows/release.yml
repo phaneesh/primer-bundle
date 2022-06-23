@@ -1,0 +1,21 @@
+name: Release
+
+on: [push]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Maven
+        uses: actions/setup-java@v3
+        with:
+          java-version: '8'
+          server-id: clojars
+          server-username: CLOJARS_USERNAME
+          server-password: CLOJARS_PASSWORD
+      - name: Maven Package
+        run: mvn -U clean deploy
+        env:
+          CLOJARS_USERNAME: ${{secrets.CLOJARS_USERNAME}}
+          CLOJARS_PASSWORD: ${{secrets.CLOJARS_PASSWORD}}
