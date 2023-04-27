@@ -47,7 +47,7 @@
         <dropwizard.version>2.0.31</dropwizard.version>
         <lombok.version>1.18.24</lombok.version>
         <lombok.maven.version>1.18.20.0</lombok.maven.version>
-        <jose4j.version>0.7.12</jose4j.version>
+        <jose4j.version>0.9.3</jose4j.version>
         <feign.version>11.8</feign.version>
         <feign.ranger.version>0.1.8</feign.ranger.version>
         <caffeine.version>2.9.3</caffeine.version>
